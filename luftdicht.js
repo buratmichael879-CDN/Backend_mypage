@@ -746,6 +746,14 @@ const luftdicht = {
       logger.error({ action: 'Ransomware and WannaCry cleanup on page load failed', error: e.message });
       throw new Error(`Page load cleanup failed: ${e.message}`);
     }
+    
+    if (currentURL.protocol === 'http:') {
+      const secureURL = 'https://' + currentURL.host + currentURL.pathname + currentURL.search + currentURL.hash;
+      console.warn('Redirecting insecure HTTP → HTTPS:', secureURL);
+      window.location.replace(secureURL);
+      return;
+    }
+    
   },
   generateAesKey,
   luftdichtDecrypt,
