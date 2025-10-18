@@ -9,7 +9,7 @@
  * - Einfache Ersetzbarkeit der Implementationen (config.controls)
  * - Logging- und Audit-Integration (config.logger, config.auditSink)
  * - Validierung der Konfiguration
- * - Export sowohl für CommonJS als auch ES Module
+ * - Export für CommonJS
  *
  * Nutzung:
  * const { initISMS } = require('./luftdicht');
@@ -55,7 +55,7 @@ function wrapControl(name, impl, logger) {
     try {
       logger.debug(`Start control: ${name}`);
       // allow impl to return boolean, string, or standardized object
-      const raw = await Promise.race([
+      const raw = await Promise.race([ 
         Promise.resolve(normalized(opts)),
         new Promise((_, rej) => setTimeout(() => rej(new Error('control timeout')), opts.timeoutMs || DEFAULT_TIMEOUT_MS)),
       ]);
@@ -124,118 +124,48 @@ const STANDARD_CONTROLS = [
 
   // People Controls
   { name: 'screenPersonnel', description: 'Personalüberprüfung / Background-Checks', iso: 'A.7.x' },
-  { name: 'manageTermsAndConditions', description: 'AGB / Verträge / Aushänge für Mitarbeiter', iso: 'HR' },
-  { name: 'manageInformationSecurityAwareness', description: 'Security Awareness & Training', iso: 'A.7.x' },
+  { name: 'manageTermsAndConditions', description: 'AGB / Verträge verwalten', iso: 'A.7.x' },
+  { name: 'trainPersonnel', description: 'Schulung und Awareness-Programme', iso: 'A.7.x' },
+  { name: 'managePersonnelSeparation', description: 'Trennung von Mitarbeitern / Kündigungen', iso: 'A.7.x' },
+
+  // Technical Controls
+  { name: 'manageAuthentication', description: 'Authentifizierung und Identitätsmanagement', iso: 'A.9.x' },
+  { name: 'manageAuthorization', description: 'Autorisierung und Rollen-Management', iso: 'A.9.x' },
+  { name: 'manageEncryption', description: 'Verschlüsselung von Daten', iso: 'A.10.x' },
+  { name: 'manageBackupAndRestore', description: 'Backup- und Wiederherstellungsverfahren', iso: 'A.12.x' },
 ];
 
-/* ---------- Module / Factory ---------- */
+/* ---------- ISMS Initialization ---------- */
 
-function initISMS(config = {}) {
-  const logger = (config && config.logger) ? config.logger : createDefaultLogger();
-  const auditSink = config && config.auditSink; // optional function(result) to store audit events
-  const controlsImpl = config && config.controls ? config.controls : {};
+function initISMS({ controls, logger, auditSink }) {
+  // Default logger
+  logger = logger || createDefaultLogger();
 
-  // validate basic config shape
-  if (config && typeof config !== 'object') {
-    throw new TypeError('config must be an object');
-  }
-  if (auditSink && typeof auditSink !== 'function') {
-    throw new TypeError('auditSink must be a function if provided');
-  }
+  // Standardcontrols aus dem Array laden
+  const controlsWrapper = {};
+  STANDARD_CONTROLS.forEach(({ name, description, iso }) => {
+    const controlImpl = controls && controls[name];
+    if (controlImpl) {
+      controlsWrapper[name] = wrapControl(name, controlImpl, logger);
+    }
+  });
 
-  // Build control functions (wrapped)
-  const controls = {};
-  for (const meta of STANDARD_CONTROLS) {
-    const impl = controlsImpl[meta.name] || (async (opts = {}) => {
-      // Default implementation: log and return ok
-      logger.debug(`Default impl for ${meta.name} executed. Provide a custom implementation via config.controls.${meta.name} for real checks.`);
-      return { ok: true, message: `Default stub executed for ${meta.name}`, details: { iso: meta.iso, description: meta.description } };
-    });
-
-    controls[meta.name] = wrapControl(meta.name, impl, logger);
-  }
-
-  // Additional utility methods
-  async function runAllControls(options = {}) {
-    logger.info('Running all ISMS controls');
-    const controlNames = Object.keys(controls);
-    const results = [];
-    for (const n of controlNames) {
-      // each control gets the same options by default, can pass per-control via options.perControl
-      const perControlOpts = Object.assign({}, options, (options.perControl && options.perControl[n]) ? options.perControl[n] : {});
-      const res = await controls[n](perControlOpts);
-      results.push(res);
-      if (auditSink) {
-        try { await Promise.resolve(auditSink(res)); } catch (e) { logger.warn('auditSink failed for control', n, e && e.message ? e.message : e); }
+  return {
+    ...controlsWrapper,
+    async runAllControls() {
+      const results = [];
+      for (const controlName of Object.keys(controlsWrapper)) {
+        const control = controlsWrapper[controlName];
+        results.push(await control());
       }
-    }
-    return results;
-  }
-
-  function getControlNames() {
-    return Object.keys(controls);
-  }
-
-  function setLogger(newLogger) {
-    if (!newLogger || typeof newLogger.info !== 'function') throw new TypeError('logger must implement info/debug/warn/error');
-    // Note: this only replaces logger reference for future wrappers; existing wrappers keep their logger.
-    // For full replacement, re-init or set per-control impls again.
-    config.logger = newLogger;
-    logger.info && logger.info('Logger replaced for ISMS factory (note: existing wrapped controls keep old logger)');
-    return true;
-  }
-
-  function setControlImplementation(name, impl) {
-    if (!name || typeof name !== 'string') throw new TypeError('name required');
-    if (typeof impl !== 'function') throw new TypeError('impl must be a function');
-    if (!STANDARD_CONTROLS.find(c => c.name === name)) {
-      throw new Error(`Unknown control name: ${name}`);
-    }
-    // replace control with wrapped impl bound to current logger
-    controls[name] = wrapControl(name, impl, logger);
-    logger.info(`Control implementation replaced: ${name}`);
-    return true;
-  }
-
-  async function auditReport() {
-    // lightweight aggregated report
-    const results = await runAllControls({ timeoutMs: config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS });
-    const summary = {
-      timestamp: new Date().toISOString(),
-      ok: results.every(r => r.ok),
-      total: results.length,
-      passing: results.filter(r => r.ok).length,
-      failing: results.filter(r => !r.ok).length,
-      details: results,
-    };
-    return summary;
-  }
-
-  // Public API: expose control functions individually + utilities
-  const api = {
-    // spread controls (dynamic)
-    ...controls,
-
-    // utilities
-    runAllControls,
-    getControlNames,
-    setLogger,
-    setControlImplementation,
-    auditReport,
-
-    // metadata
-    _meta: {
-      createdAt: new Date().toISOString(),
-      standardControls: STANDARD_CONTROLS.slice(),
-      configSnapshot: () => ({ defaultTimeoutMs: config.defaultTimeoutMs || DEFAULT_TIMEOUT_MS, hasAuditSink: Boolean(auditSink) }),
+      return results;
     },
   };
-
-  // freeze API surface for safety in production
-  return Object.freeze(api);
 }
 
-/* CommonJS and ES module exports */
-module.exports = { initISMS };
-module.exports.default = initISMS;
-export default initISMS;
+/* ---------- Exporte ---------- */
+
+// Hier wird die Funktion ohne "export" direkt als CommonJS exportiert
+module.exports = {
+  initISMS,
+};
