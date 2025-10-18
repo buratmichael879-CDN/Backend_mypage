@@ -1,4 +1,4 @@
-```javascript
+
 /**
  * ISO 27001:2022 & NIS2 Web Security Module with HTTP Enforcement
  * Version: 2.5 (October 18, 2025)
