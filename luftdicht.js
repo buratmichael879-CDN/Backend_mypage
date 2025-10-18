@@ -18,7 +18,7 @@ const HASH_ALGO = 'SHA-256'; // For hashing
 
 // Simulated secure configuration fetch for API keys (replace with actual vault integration)
 const getSecureConfig = () => ({
-  VT_API_KEY: 'your-virustotal-api-key-here' // Replace with secure vault fetch
+  VT_API_KEY: 'beb72ad18fa50a7f2311caa4897c87b25de44fe1704f7a1f3cb24bb3179bcf8d' // Replace with secure vault fetch
 });
 
 // Blocklist for VPN/Tor/Google, AI/Messaging servers, and known malicious domains
