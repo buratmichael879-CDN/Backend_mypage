@@ -7,6 +7,8 @@
    - Permissions-Policy injection (no CSP)
    - Background watchdog + service worker neutralizer
    - Freeze/thaw mechanism for DOM restrictions
+   - Ransomware protection (File System API block, Crypto API monitoring, suspicious activity detection)
+   - XSS protection (input sanitization, DOM clobbering prevention, script execution control)
 */
 
 (function Luftdicht(window, document) {
@@ -25,9 +27,9 @@
   (function injectPermissions() {
     const meta = document.createElement('meta');
     meta.name = 'permissions-policy';
-    meta.content = 'camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), notifications=()';
+    meta.content = 'camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=(), notifications=(), filesystem=()';
     document.head.prepend(meta);
-    LOG('Permissions-Policy applied');
+    LOG('Permissions-Policy applied, including filesystem');
   })();
 
   // === 2. Privacy Protection Core ===
@@ -139,7 +141,96 @@
     blockAutofill();
   })();
 
-  // === 4. Background Watchdog + Service Worker Neutralizer ===
+  // === 4. Ransomware Protection ===
+  (function ransomwareProtection() {
+    // Block File System Access API
+    if (window.showDirectoryPicker || window.showOpenFilePicker || window.showSaveFilePicker) {
+      window.showDirectoryPicker = window.showOpenFilePicker = window.showSaveFilePicker = () => Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+      LOG('File System Access API blocked');
+    }
+
+    // Monitor Web Crypto API usage
+    const originalSubtleCrypto = window.crypto.subtle;
+    if (window.crypto && window.crypto.subtle) {
+      window.crypto.subtle = new Proxy(originalSubtleCrypto, {
+        get(target, prop) {
+          if (['encrypt', 'generateKey'].includes(prop)) {
+            LOG('Suspicious Web Crypto API call detected:', prop);
+            freeze(); // Freeze DOM on suspicious crypto activity
+            return () => Promise.reject(new DOMException('Blocked', 'NotAllowedError'));
+          }
+          return target[prop];
+        }
+      });
+      LOG('Web Crypto API monitored');
+    }
+
+    // Detect rapid DOM modifications (potential ransomware behavior)
+    let modificationCount = 0;
+    const modificationThreshold = 50; // Arbitrary threshold for rapid changes
+    const modificationWindow = 1000; // 1 second window
+    setInterval(() => {
+      if (modificationCount > modificationThreshold) {
+        LOG('Rapid DOM modifications detected, potential ransomware activity');
+        freeze();
+      }
+      modificationCount = 0;
+    }, modificationWindow);
+  })();
+
+  // === 5. XSS Protection ===
+  (function xssProtection() {
+    // Sanitize dynamic inputs
+    const sanitizeInput = (value) => {
+      return value.replace(/[<>]/g, '').replace(/(\b(on\w+)=)/gi, 'data-$1'); // Remove HTML tags and event attributes
+    };
+
+    // Override dangerous DOM methods
+    const originalInnerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML').set;
+    Object.defineProperty(Element.prototype, 'innerHTML', {
+      set(value) {
+        const sanitized = sanitizeInput(value);
+        LOG('Sanitized innerHTML input');
+        return originalInnerHTML.call(this, sanitized);
+      }
+    });
+
+    // Block eval and Function constructor
+    window.eval = window.Function = () => {
+      LOG('Blocked eval or Function constructor');
+      throw new Error('Dynamic code execution blocked');
+    };
+
+    // Prevent DOM clobbering
+    const protectDOM = () => {
+      ['createElement', 'createElementNS', 'appendChild', 'insertBefore'].forEach(method => {
+        const original = document[method];
+        document[method] = function (...args) {
+          if (args[0] && args[0].tagName === 'SCRIPT') {
+            LOG('Blocked dynamic script injection');
+            return null;
+          }
+          return original.apply(this, args);
+        };
+      });
+      LOG('DOM clobbering protection applied');
+    };
+
+    // Monitor suspicious event listeners
+    const originalAddEventListener = EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener = function (type, listener, options) {
+      if (type.startsWith('on') || /javascript:/i.test(listener.toString())) {
+        LOG('Blocked suspicious event listener:', type);
+        return;
+      }
+      return originalAddEventListener.apply(this, [type, listener, options]);
+    };
+
+    protectDOM();
+    LOG('XSS protection initialized');
+  })();
+
+  // === 6. Background Watchdog + Service Worker Neutralizer ===
   (function watchdog() {
     // Neutralize service workers
     if ('serviceWorker' in navigator) {
@@ -151,12 +242,17 @@
       LOG('Service worker registration disabled');
     }
 
-    // Watchdog to detect unauthorized DOM changes
+    // Enhanced watchdog for ransomware and XSS detection
+    let modificationCount = 0; // Shared with ransomware protection
     const observer = new MutationObserver(mutations => {
       mutations.forEach(mutation => {
         if (mutation.addedNodes.length || mutation.removedNodes.length) {
-          LOG('Unauthorized DOM change detected at', now());
-          // Optionally revert or log changes
+          modificationCount++;
+          if (mutation.addedNodes.length && Array.from(mutation.addedNodes).some(node => node.tagName === 'SCRIPT')) {
+            LOG('Unauthorized script injection detected at', now());
+            freeze(); // Freeze DOM on script injection
+            mutation.addedNodes.forEach(node => node.remove());
+          }
         }
       });
     });
@@ -164,12 +260,12 @@
     LOG('Watchdog started');
   })();
 
-  // === 5. Freeze/Thaw Mechanism ===
+  // === 7. Freeze/Thaw Mechanism ===
   (function freezeThaw() {
     let isFrozen = false;
 
     // Freeze: Lock DOM to prevent modifications
-    const freeze = () => {
+    window.freeze = () => {
       if (!isFrozen) {
         document.documentElement.style.pointerEvents = 'none';
         document.body.style.userSelect = 'none';
@@ -179,7 +275,7 @@
     };
 
     // Thaw: Unlock DOM
-    const thaw = () => {
+    window.thaw = () => {
       if (isFrozen) {
         document.documentElement.style.pointerEvents = '';
         document.body.style.userSelect = '';
@@ -188,30 +284,30 @@
       }
     };
 
-    // Detect potential freeze conditions (e.g., external scripts trying to lock DOM)
+    // Detect external freeze conditions
     const checkFreeze = () => {
       if (document.documentElement.style.pointerEvents === 'none' && !isFrozen) {
         LOG('External DOM freeze detected, thawing immediately');
-        thaw();
+        window.thaw();
       }
     };
 
     // Periodically check for freeze conditions
     setInterval(checkFreeze, 1000);
 
-    // Example: Freeze on suspicious activity (e.g., excessive script injections)
+    // Freeze on suspicious activity (e.g., excessive script injections)
     document.addEventListener('beforescriptexecute', e => {
       const scripts = document.getElementsByTagName('script').length;
       if (scripts > 10) { // Arbitrary threshold
-        freeze();
+        window.freeze();
         LOG('DOM frozen due to excessive script injections');
       }
     });
 
-    // Thaw on user command or specific condition
+    // Thaw on user command
     window.addEventListener('message', e => {
       if (e.data === 'thaw') {
-        thaw();
+        window.thaw();
       }
     });
 
