@@ -8,7 +8,7 @@
 // ==============================
 (() => {
   try {
-    const allowedHost = 'raw.githubusercontent.com';
+    const allowedHost = 'http:localhost:8080';
     const currentURL = new URL(window.location.href);
 
     // 1. Nur http: erlauben
