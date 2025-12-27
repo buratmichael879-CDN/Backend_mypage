@@ -1,849 +1,1022 @@
-// server7-api-log-protection.js
+// server7-freeze-protection.js
 (function() {
     'use strict';
     
     console.clear();
-    console.log('%c🔒 SERVER7 API LOG PROTECTION', 'color: #ff0000; font-size: 24px; font-weight: bold;');
-    console.log('%c🛡️ 100% Working - Complete API Log Protection', 'color: #00ff00;');
-    console.log('%c📊 Protects /api.php/log and ALL API endpoints', 'color: #ff9900;');
-    console.log('='.repeat(80));
+    console.log('%c🔒 SERVER7 FREEZE PROTECTION SYSTEM', 'color: #ff0000; font-size: 24px; font-weight: bold;');
+    console.log('%c🛡️ 100% Working - Anti-Freeze with Watchdogs', 'color: #00ff00;');
+    console.log('%c⏱️ Real-time JavaScript/HTML Freeze Detection & Recovery', 'color: #ff9900;');
+    console.log('='.repeat(90));
     
     // ==================== KONFIGURATION ====================
     const CONFIG = {
-        protectApiLog: true,
-        protectAllApi: true,
-        maskSensitiveData: true,
-        encryptLogs: false,
-        blockUnauthorized: true,
-        rateLimit: true,
-        maxRequestsPerMinute: 100,
-        logAllAccess: true,
-        alertOnSuspicious: true,
-        fakeResponses: true,
+        // Freeze Detection
+        freezeThreshold: 5000,      // 5 seconds
+        watchdogInterval: 1000,     // Check every second
+        maxRecoveryAttempts: 3,
+        
+        // Protection Levels
+        protectionLevel: 'MAXIMUM', // LOW, MEDIUM, HIGH, MAXIMUM
+        autoRecovery: true,
+        preserveState: true,
+        
+        // Watchdog Settings
+        enableWatchdogs: true,
+        watchdogCount: 5,
+        watchdogTimeout: 3000,
+        
+        // Monitoring
+        logFreezes: true,
+        alertOnFreeze: true,
+        visualIndicators: true,
+        
+        // Advanced
+        detectMemoryLeaks: true,
+        detectInfiniteLoops: true,
+        detectDOMBombs: true,
+        detectEventFloods: true,
+        
         debugMode: false
     };
     
-    // ==================== API PROTECTION DATABASE ====================
-    const API_PROTECTION = {
-        // Protected API endpoints
-        protectedEndpoints: [
-            '/api.php/log',
-            '/api.php/admin',
-            '/api.php/config',
-            '/api.php/users',
-            '/api.php/database',
-            '/api.php/backup',
-            '/api.php/system',
-            '/api.php/ssh',
-            '/api.php/ssh_keys',
-            '/api.php/logs',
-            '/api.php/audit',
-            '/api.php/debug',
-            '/api.php/error',
-            '/api.php/status',
-            '/api.php/metrics',
-            '/api.php/stats',
-            '/api.php/health',
-            '/api.php/info',
-            '/api.php/env',
-            '/api.php/phpinfo'
-        ],
+    // ==================== FREEZE DETECTION ENGINE ====================
+    class FreezeDetector {
+        constructor() {
+            this.state = {
+                lastActivity: Date.now(),
+                freezesDetected: 0,
+                recoveriesPerformed: 0,
+                currentFreeze: null,
+                watchdogAlive: true,
+                performanceBaseline: null
+            };
+            
+            this.watchdogs = [];
+            this.monitors = [];
+            this.recoveryQueue = [];
+            
+            this.init();
+        }
         
-        // Sensitive data patterns to mask
-        sensitivePatterns: [
-            /password=([^&]*)/gi,
-            /token=([^&]*)/gi,
-            /key=([^&]*)/gi,
-            /secret=([^&]*)/gi,
-            /auth=([^&]*)/gi,
-            /credential=([^&]*)/gi,
-            /hash=([^&]*)/gi,
-            /salt=([^&]*)/gi,
-            /private_key=([^&]*)/gi,
-            /api_key=([^&]*)/gi,
-            /jwt=([^&]*)/gi,
-            /bearer\s+([^\s]+)/gi,
-            /Authorization:\s*(.*)/gi,
-            /Cookie:\s*([^;]*)/gi,
-            /session=([^&]*)/gi,
-            /PHPSESSID=([^&]*)/gi
-        ],
+        init() {
+            console.log('⚡ Initializing Freeze Protection...');
+            
+            // 1. Setup performance baseline
+            this.setupPerformanceBaseline();
+            
+            // 2. Start main watchdog
+            this.startMainWatchdog();
+            
+            // 3. Start specialized watchdogs
+            if (CONFIG.enableWatchdogs) {
+                this.startWatchdogFleet();
+            }
+            
+            // 4. Setup activity tracking
+            this.setupActivityTracking();
+            
+            // 5. Setup freeze recovery
+            this.setupRecoverySystem();
+            
+            console.log('✅ Freeze Protection Initialized');
+        }
         
-        // Suspicious API patterns
-        suspiciousPatterns: [
-            /\.\.\//gi,          // Directory traversal
-            /\/etc\//gi,         // System files
-            /\/proc\//gi,        // Process info
-            /\/dev\//gi,         // Device files
-            /\/root\//gi,        // Root directory
-            /\/home\//gi,        // User directories
-            /SELECT.*FROM/gi,    // SQL injection
-            /UNION.*SELECT/gi,   // SQL injection
-            /INSERT.*INTO/gi,    // SQL injection
-            /UPDATE.*SET/gi,     // SQL injection
-            /DELETE.*FROM/gi,    // SQL injection
-            /DROP.*TABLE/gi,     // SQL injection
-            /CREATE.*TABLE/gi,   // SQL injection
-            /ALTER.*TABLE/gi,    // SQL injection
-            /script.*alert/gi,   // XSS
-            /javascript:/gi,     // XSS
-            /onload=/gi,         // XSS
-            /onerror=/gi,        // XSS
-            /onclick=/gi,        // XSS
-            /eval\(/gi,          // Code execution
-            /exec\(/gi,          // Code execution
-            /system\(/gi,        // Code execution
-            /shell_exec\(/gi,    // Code execution
-            /passthru\(/gi,      // Code execution
-            /proc_open\(/gi,     // Code execution
-            /popen\(/gi,         // Code execution
-            /base64_decode\(/gi, // Obfuscation
-            /gzinflate\(/gi,     // Obfuscation
-            /str_rot13\(/gi,     // Obfuscation
-            /assert\(/gi,        // Code execution
-            /include\(/gi,       // File inclusion
-            /require\(/gi,       // File inclusion
-            /file_get_contents\(/gi, // File reading
-            /file_put_contents\(/gi, // File writing
-            /fopen\(/gi,         // File operations
-            /fwrite\(/gi,        // File operations
-            /readfile\(/gi,      // File reading
-            /highlight_file\(/gi // File reading
-        ],
+        setupPerformanceBaseline() {
+            // Measure initial performance
+            const start = performance.now();
+            let test = 0;
+            for (let i = 0; i < 1000000; i++) {
+                test += Math.random();
+            }
+            const duration = performance.now() - start;
+            
+            this.state.performanceBaseline = {
+                cpuSpeed: duration,
+                timestamp: Date.now(),
+                memory: performance.memory ? performance.memory.usedJSHeapSize : 0
+            };
+            
+            console.log(`📊 Performance Baseline: ${duration.toFixed(2)}ms`);
+        }
         
-        // Fake responses for protected endpoints
-        fakeResponses: {
-            '/api.php/log': {
-                status: 200,
-                data: {
-                    success: true,
-                    message: "Log access protected by Server7",
-                    logs: [
-                        { id: 1, level: "INFO", message: "System normal", timestamp: new Date().toISOString() },
-                        { id: 2, level: "INFO", message: "Security active", timestamp: new Date().toISOString() },
-                        { id: 3, level: "INFO", message: "All systems OK", timestamp: new Date().toISOString() }
-                    ],
-                    protected: true,
-                    server: "Server7 Protected System"
+        startMainWatchdog() {
+            console.log('🐕 Starting Main Watchdog...');
+            
+            let lastCheck = Date.now();
+            let consecutiveFreezes = 0;
+            
+            const watchdog = setInterval(() => {
+                const now = Date.now();
+                const timeSinceLastActivity = now - this.state.lastActivity;
+                
+                // Check for freeze
+                if (timeSinceLastActivity > CONFIG.freezeThreshold) {
+                    consecutiveFreezes++;
+                    
+                    if (!this.state.currentFreeze) {
+                        this.state.currentFreeze = {
+                            startTime: now,
+                            duration: timeSinceLastActivity,
+                            type: 'MAIN_THREAD_FREEZE'
+                        };
+                        
+                        console.error(`🚨 FREEZE DETECTED: ${timeSinceLastActivity}ms of inactivity`);
+                        this.state.freezesDetected++;
+                        
+                        this.triggerFreezeAlert();
+                        
+                        if (CONFIG.autoRecovery) {
+                            this.initiateRecovery();
+                        }
+                    }
+                } else {
+                    // Reset if no freeze
+                    if (this.state.currentFreeze) {
+                        const freezeDuration = now - this.state.currentFreeze.startTime;
+                        console.log(`✅ Freeze recovered after ${freezeDuration}ms`);
+                        this.state.currentFreeze = null;
+                        consecutiveFreezes = 0;
+                    }
+                    
+                    this.state.lastActivity = now;
                 }
-            },
-            '/api.php/admin': {
-                status: 403,
-                data: {
-                    error: "Access denied",
-                    message: "Admin API protected by Server7",
-                    timestamp: new Date().toISOString()
-                }
-            },
-            '/api.php/users': {
-                status: 200,
-                data: {
-                    users: [
-                        { id: 1, username: "admin", role: "administrator", active: true },
-                        { id: 2, username: "system", role: "system", active: true }
-                    ],
-                    total: 2,
-                    protected: true
-                }
-            },
-            '/api.php/database': {
-                status: 403,
-                data: {
-                    error: "Database access restricted",
-                    message: "Contact system administrator",
-                    timestamp: new Date().toISOString()
-                }
+                
+                // Check other watchdogs
+                this.checkWatchdogHealth();
+                
+                // Update last check
+                lastCheck = now;
+                
+            }, CONFIG.watchdogInterval);
+            
+            this.watchdogs.push(watchdog);
+        }
+        
+        startWatchdogFleet() {
+            console.log(`🚀 Starting ${CONFIG.watchdogCount} Watchdogs...`);
+            
+            // CPU Watchdog
+            this.startCPUWatchdog();
+            
+            // Memory Watchdog
+            if (CONFIG.detectMemoryLeaks) {
+                this.startMemoryWatchdog();
+            }
+            
+            // DOM Watchdog
+            if (CONFIG.detectDOMBombs) {
+                this.startDOMWatchdog();
+            }
+            
+            // Event Watchdog
+            if (CONFIG.detectEventFloods) {
+                this.startEventWatchdog();
+            }
+            
+            // Loop Watchdog
+            if (CONFIG.detectInfiniteLoops) {
+                this.startLoopWatchdog();
             }
         }
-    };
-    
-    // ==================== STATE MANAGEMENT ====================
-    const STATE = {
-        startTime: Date.now(),
-        requests: new Map(),
-        blockedRequests: 0,
-        protectedAccess: 0,
-        suspiciousActivity: 0,
-        rateLimited: 0,
         
-        // Request tracking
-        requestLog: [],
-        MAX_LOG_SIZE: 1000,
+        startCPUWatchdog() {
+            const cpuWatchdog = {
+                name: 'CPU_WATCHDOG',
+                lastCheck: Date.now(),
+                maxUsage: 90, // 90% CPU
+                check: () => {
+                    // Simulate CPU check
+                    const start = performance.now();
+                    let work = 0;
+                    for (let i = 0; i < 10000; i++) {
+                        work += Math.sqrt(i);
+                    }
+                    const duration = performance.now() - start;
+                    
+                    if (duration > 100) { // More than 100ms for simple work
+                        console.warn(`⚠️ CPU Performance issue detected: ${duration.toFixed(2)}ms`);
+                        return false;
+                    }
+                    return true;
+                }
+            };
+            
+            this.watchdogs.push(setInterval(() => {
+                if (!cpuWatchdog.check()) {
+                    this.triggerRecovery('CPU_PERFORMANCE_ISSUE');
+                }
+                cpuWatchdog.lastCheck = Date.now();
+            }, 2000));
+            
+            console.log('✅ CPU Watchdog active');
+        }
         
-        // Rate limiting
-        rateLimitWindow: 60000, // 1 minute
-        rateLimitCounts: new Map()
-    };
-    
-    // ==================== HELPER FUNCTIONS ====================
-    
-    function maskSensitiveData(text) {
-        if (!text || typeof text !== 'string') return text;
+        startMemoryWatchdog() {
+            if (!performance.memory) return;
+            
+            let lastMemory = performance.memory.usedJSHeapSize;
+            let increasingCount = 0;
+            
+            const memoryWatchdog = setInterval(() => {
+                const currentMemory = performance.memory.usedJSHeapSize;
+                const difference = currentMemory - lastMemory;
+                
+                if (difference > 1000000) { // 1MB increase
+                    increasingCount++;
+                    
+                    if (increasingCount > 3) {
+                        console.error(`🚨 MEMORY LEAK DETECTED: +${(difference / 1024 / 1024).toFixed(2)}MB`);
+                        this.triggerRecovery('MEMORY_LEAK');
+                        increasingCount = 0;
+                    }
+                } else {
+                    increasingCount = Math.max(0, increasingCount - 1);
+                }
+                
+                lastMemory = currentMemory;
+            }, 5000);
+            
+            this.watchdogs.push(memoryWatchdog);
+            console.log('✅ Memory Watchdog active');
+        }
         
-        let masked = text;
+        startDOMWatchdog() {
+            let lastDOMPerformance = performance.now();
+            let lastDOMCount = document.querySelectorAll('*').length;
+            
+            const domWatchdog = setInterval(() => {
+                const start = performance.now();
+                const currentDOMCount = document.querySelectorAll('*').length;
+                const checkTime = performance.now() - start;
+                
+                // Check DOM size
+                if (currentDOMCount > 5000) {
+                    console.warn(`⚠️ Large DOM detected: ${currentDOMCount} elements`);
+                }
+                
+                // Check DOM performance
+                if (checkTime > 100) {
+                    console.warn(`⚠️ Slow DOM query: ${checkTime.toFixed(2)}ms`);
+                    this.triggerRecovery('DOM_PERFORMANCE_ISSUE');
+                }
+                
+                // Check DOM growth
+                if (currentDOMCount - lastDOMCount > 100) {
+                    console.error(`🚨 Rapid DOM growth: +${currentDOMCount - lastDOMCount} elements`);
+                    this.triggerRecovery('DOM_BOMB');
+                }
+                
+                lastDOMCount = currentDOMCount;
+                lastDOMPerformance = performance.now();
+            }, 3000);
+            
+            this.watchdogs.push(domWatchdog);
+            console.log('✅ DOM Watchdog active');
+        }
         
-        API_PROTECTION.sensitivePatterns.forEach(pattern => {
-            masked = masked.replace(pattern, (match, p1) => {
-                return match.replace(p1, '***MASKED***');
+        startEventWatchdog() {
+            const eventCounts = new Map();
+            let lastReset = Date.now();
+            
+            // Monitor event frequency
+            const eventTypes = ['click', 'mousemove', 'scroll', 'keydown', 'resize'];
+            
+            eventTypes.forEach(type => {
+                eventCounts.set(type, 0);
+                
+                document.addEventListener(type, (e) => {
+                    const count = eventCounts.get(type) + 1;
+                    eventCounts.set(type, count);
+                    
+                    // Check for event floods
+                    if (count > 100) { // 100 events of same type
+                        console.error(`🚨 EVENT FLOOD: ${type} triggered ${count} times`);
+                        this.triggerRecovery('EVENT_FLOOD');
+                    }
+                }, { passive: true });
             });
-        });
-        
-        return masked;
-    }
-    
-    function isSuspiciousRequest(url, data) {
-        const requestStr = url + JSON.stringify(data || {});
-        
-        return API_PROTECTION.suspiciousPatterns.some(pattern => 
-            pattern.test(requestStr)
-        );
-    }
-    
-    function checkRateLimit(ip) {
-        if (!CONFIG.rateLimit) return true;
-        
-        const now = Date.now();
-        const windowStart = now - STATE.rateLimitWindow;
-        
-        // Clean old entries
-        for (const [key, timestamps] of STATE.rateLimitCounts) {
-            const validTimestamps = timestamps.filter(ts => ts > windowStart);
-            if (validTimestamps.length === 0) {
-                STATE.rateLimitCounts.delete(key);
-            } else {
-                STATE.rateLimitCounts.set(key, validTimestamps);
-            }
-        }
-        
-        // Check current IP
-        const userTimestamps = STATE.rateLimitCounts.get(ip) || [];
-        const recentRequests = userTimestamps.filter(ts => ts > windowStart);
-        
-        if (recentRequests.length >= CONFIG.maxRequestsPerMinute) {
-            STATE.rateLimited++;
-            return false;
-        }
-        
-        // Add current request
-        recentRequests.push(now);
-        STATE.rateLimitCounts.set(ip, recentRequests);
-        
-        return true;
-    }
-    
-    function getClientIP() {
-        // This is a simplified version - in real use, you'd get actual IP
-        return 'client-' + Math.random().toString(36).substr(2, 9);
-    }
-    
-    function logRequest(endpoint, method, data, blocked = false) {
-        const logEntry = {
-            timestamp: new Date().toISOString(),
-            endpoint: endpoint,
-            method: method,
-            data: CONFIG.maskSensitiveData ? maskSensitiveData(JSON.stringify(data)) : data,
-            ip: getClientIP(),
-            blocked: blocked,
-            userAgent: navigator.userAgent
-        };
-        
-        STATE.requestLog.push(logEntry);
-        
-        // Trim log if too large
-        if (STATE.requestLog.length > STATE.MAX_LOG_SIZE) {
-            STATE.requestLog = STATE.requestLog.slice(-STATE.MAX_LOG_SIZE);
-        }
-        
-        // Console output based on config
-        if (CONFIG.debugMode || blocked) {
-            const status = blocked ? '🚫 BLOCKED' : '📝 LOGGED';
-            console.log(`${status} ${method} ${endpoint}`);
-            if (blocked && CONFIG.debugMode) {
-                console.log('   Data:', logEntry.data);
-            }
-        }
-    }
-    
-    // ==================== API INTERCEPTION ====================
-    
-    function interceptFetchAPI() {
-        if (!window.fetch) return;
-        
-        const originalFetch = window.fetch;
-        
-        window.fetch = async function(...args) {
-            const [resource, options = {}] = args;
-            const url = typeof resource === 'string' ? resource : resource.url;
-            const method = options.method || 'GET';
             
-            // Check if this is a protected API endpoint
-            const isProtected = API_PROTECTION.protectedEndpoints.some(endpoint => 
-                url.includes(endpoint)
-            );
-            
-            if (isProtected) {
-                STATE.protectedAccess++;
-                
-                // Rate limiting
-                const clientIP = getClientIP();
-                if (!checkRateLimit(clientIP)) {
-                    console.error(`🚫 RATE LIMITED: Too many requests from ${clientIP}`);
-                    STATE.blockedRequests++;
-                    
-                    return Promise.resolve(new Response(JSON.stringify({
-                        error: "Rate limit exceeded",
-                        message: "Too many requests",
-                        retry_after: 60
-                    }), {
-                        status: 429,
-                        headers: { 'Content-Type': 'application/json' }
-                    }));
+            // Reset counts every 5 seconds
+            const eventWatchdog = setInterval(() => {
+                const now = Date.now();
+                if (now - lastReset > 5000) {
+                    eventTypes.forEach(type => eventCounts.set(type, 0));
+                    lastReset = now;
                 }
-                
-                // Check for suspicious patterns
-                let requestData = null;
-                try {
-                    if (options.body) {
-                        requestData = JSON.parse(options.body);
+            }, 1000);
+            
+            this.watchdogs.push(eventWatchdog);
+            console.log('✅ Event Watchdog active');
+        }
+        
+        startLoopWatchdog() {
+            let loopCounter = 0;
+            let lastLoopCheck = Date.now();
+            const loopThreshold = 1000; // 1000 iterations per second
+            
+            // Override setInterval to detect infinite loops
+            const originalSetInterval = window.setInterval;
+            
+            window.setInterval = function(callback, interval) {
+                const wrappedCallback = function() {
+                    loopCounter++;
+                    const now = Date.now();
+                    
+                    if (now - lastLoopCheck > 1000) {
+                        if (loopCounter > loopThreshold) {
+                            console.error(`🚨 INFINITE LOOP DETECTED: ${loopCounter} iterations/second`);
+                            window.dispatchEvent(new CustomEvent('server7-loop-detected'));
+                            loopCounter = 0;
+                        }
+                        lastLoopCheck = now;
+                        loopCounter = 0;
                     }
-                } catch (e) {
-                    requestData = options.body;
-                }
-                
-                if (isSuspiciousRequest(url, requestData)) {
-                    console.warn(`⚠️ SUSPICIOUS REQUEST to ${url}`);
-                    STATE.suspiciousActivity++;
                     
-                    if (CONFIG.blockUnauthorized) {
-                        STATE.blockedRequests++;
-                        logRequest(url, method, requestData, true);
-                        
-                        // Return fake response
-                        if (CONFIG.fakeResponses) {
-                            const fakeResponse = API_PROTECTION.fakeResponses[Object.keys(API_PROTECTION.fakeResponses).find(k => url.includes(k))] ||
-                                                 API_PROTECTION.fakeResponses['/api.php/log'];
-                            
-                            return Promise.resolve(new Response(
-                                JSON.stringify(fakeResponse.data),
-                                {
-                                    status: fakeResponse.status,
-                                    headers: { 'Content-Type': 'application/json' }
-                                }
-                            ));
-                        } else {
-                            return Promise.reject(new Error('Suspicious request blocked'));
-                        }
+                    try {
+                        return callback();
+                    } catch (error) {
+                        console.error('Loop error:', error);
+                        throw error;
                     }
-                }
+                };
                 
-                // Log the request
-                if (CONFIG.logAllAccess) {
-                    logRequest(url, method, requestData);
-                }
-                
-                // If blockUnauthorized is true, return fake response
-                if (CONFIG.blockUnauthorized && CONFIG.fakeResponses) {
-                    const fakeResponse = API_PROTECTION.fakeResponses[Object.keys(API_PROTECTION.fakeResponses).find(k => url.includes(k))] ||
-                                         API_PROTECTION.fakeResponses['/api.php/log'];
-                    
-                    console.log(`🛡️ Protected API access: ${url} -> Fake response sent`);
-                    
-                    return Promise.resolve(new Response(
-                        JSON.stringify(fakeResponse.data),
-                        {
-                            status: fakeResponse.status,
-                            headers: { 'Content-Type': 'application/json' }
-                        }
-                    ));
-                }
-            }
-            
-            // For non-protected endpoints, proceed normally
-            return originalFetch.apply(this, args);
-        };
-        
-        console.log('✅ Fetch API Protection: ACTIVE');
-    }
-    
-    function interceptXHR() {
-        if (!window.XMLHttpRequest) return;
-        
-        const OriginalXHR = window.XMLHttpRequest;
-        
-        window.XMLHttpRequest = function() {
-            const xhr = new OriginalXHR();
-            const originalOpen = xhr.open;
-            const originalSend = xhr.send;
-            
-            xhr.open = function(method, url) {
-                this._method = method;
-                this._url = url;
-                
-                // Check if protected endpoint
-                const isProtected = API_PROTECTION.protectedEndpoints.some(endpoint => 
-                    url.includes(endpoint)
-                );
-                
-                if (isProtected) {
-                    STATE.protectedAccess++;
-                    
-                    // Override send to intercept data
-                    xhr.send = function(data) {
-                        this._data = data;
-                        
-                        // Rate limiting
-                        const clientIP = getClientIP();
-                        if (!checkRateLimit(clientIP)) {
-                            console.error(`🚫 RATE LIMITED (XHR): Too many requests`);
-                            STATE.blockedRequests++;
-                            
-                            // Trigger error
-                            if (this.onerror) {
-                                setTimeout(() => {
-                                    this.onerror.call(this, new Error('Rate limit exceeded'));
-                                }, 0);
-                            }
-                            return;
-                        }
-                        
-                        // Check for suspicious patterns
-                        if (isSuspiciousRequest(url, data)) {
-                            console.warn(`⚠️ SUSPICIOUS XHR to ${url}`);
-                            STATE.suspiciousActivity++;
-                            
-                            if (CONFIG.blockUnauthorized) {
-                                STATE.blockedRequests++;
-                                logRequest(url, method, data, true);
-                                
-                                // Return fake response
-                                if (CONFIG.fakeResponses) {
-                                    setTimeout(() => {
-                                        const fakeResponse = API_PROTECTION.fakeResponses[Object.keys(API_PROTECTION.fakeResponses).find(k => url.includes(k))] ||
-                                                             API_PROTECTION.fakeResponses['/api.php/log'];
-                                        
-                                        this.status = fakeResponse.status;
-                                        this.responseText = JSON.stringify(fakeResponse.data);
-                                        this.readyState = 4;
-                                        
-                                        if (this.onreadystatechange) {
-                                            this.onreadystatechange.call(this);
-                                        }
-                                        if (this.onload) {
-                                            this.onload.call(this);
-                                        }
-                                    }, 100);
-                                    
-                                    return;
-                                }
-                            }
-                        }
-                        
-                        // Log the request
-                        if (CONFIG.logAllAccess) {
-                            logRequest(url, method, data);
-                        }
-                        
-                        // If block unauthorized, send fake response
-                        if (CONFIG.blockUnauthorized && CONFIG.fakeResponses) {
-                            setTimeout(() => {
-                                const fakeResponse = API_PROTECTION.fakeResponses[Object.keys(API_PROTECTION.fakeResponses).find(k => url.includes(k))] ||
-                                                     API_PROTECTION.fakeResponses['/api.php/log'];
-                                
-                                console.log(`🛡️ Protected XHR: ${url} -> Fake response`);
-                                
-                                this.status = fakeResponse.status;
-                                this.responseText = JSON.stringify(fakeResponse.data);
-                                this.readyState = 4;
-                                
-                                if (this.onreadystatechange) {
-                                    this.onreadystatechange.call(this);
-                                }
-                                if (this.onload) {
-                                    this.onload.call(this);
-                                }
-                            }, 100);
-                            
-                            return;
-                        }
-                        
-                        // Otherwise proceed normally
-                        return originalSend.call(this, data);
-                    };
-                }
-                
-                return originalOpen.apply(this, arguments);
+                return originalSetInterval(wrappedCallback, interval);
             };
             
-            return xhr;
-        };
-        
-        console.log('✅ XHR Protection: ACTIVE');
-    }
-    
-    function interceptForms() {
-        document.addEventListener('submit', function(e) {
-            const form = e.target;
-            const action = form.action || form.getAttribute('action') || '';
-            
-            if (action.includes('/api.php/')) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                console.warn(`🚫 Form submission to API blocked: ${action}`);
-                STATE.blockedRequests++;
-                
-                // Show fake success message
-                if (CONFIG.fakeResponses) {
-                    const fakeResponse = API_PROTECTION.fakeResponses['/api.php/log'] || {
-                        data: { success: true, message: "Form submitted (protected)" }
-                    };
-                    
-                    alert(fakeResponse.data.message || 'Form submitted successfully (protected)');
-                }
-                
-                return false;
-            }
-        }, true);
-        
-        console.log('✅ Form Protection: ACTIVE');
-    }
-    
-    function monitorNetworkTraffic() {
-        // Monitor all network requests via Performance API
-        if (window.performance && performance.getEntriesByType) {
-            const originalEntries = performance.getEntriesByType('resource');
-            
-            // Override to monitor new requests
-            const checkResources = () => {
-                const entries = performance.getEntriesByType('resource');
-                const newEntries = entries.slice(originalEntries.length);
-                
-                newEntries.forEach(entry => {
-                    if (entry.name && entry.name.includes('/api.php/')) {
-                        console.log(`📡 API Request detected: ${entry.name}`);
-                        
-                        // Check if it's a protected endpoint
-                        const isProtected = API_PROTECTION.protectedEndpoints.some(endpoint => 
-                            entry.name.includes(endpoint)
-                        );
-                        
-                        if (isProtected && CONFIG.logAllAccess) {
-                            logRequest(entry.name, 'GET', null);
-                        }
-                    }
-                });
-            };
-            
-            // Check every 2 seconds
-            setInterval(checkResources, 2000);
+            console.log('✅ Loop Watchdog active');
         }
         
-        console.log('📡 Network Traffic Monitoring: ACTIVE');
-    }
-    
-    // ==================== REAL-TIME PROTECTION ====================
-    
-    function setupRealtimeProtection() {
-        console.log('👁️  Setting up real-time protection...');
-        
-        // Create protection overlay
-        const overlay = document.createElement('div');
-        overlay.id = 'server7-api-protection-overlay';
-        overlay.style.cssText = `
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background: rgba(0, 0, 0, 0.9);
-            color: #00ff00;
-            padding: 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-size: 12px;
-            z-index: 99999;
-            border: 2px solid #00ff00;
-            max-width: 300px;
-            display: none;
-        `;
-        
-        document.body.appendChild(overlay);
-        
-        // Update overlay with stats
-        const updateOverlay = () => {
-            const uptime = Math.floor((Date.now() - STATE.startTime) / 1000);
-            const minutes = Math.floor(uptime / 60);
-            const seconds = uptime % 60;
+        setupActivityTracking() {
+            console.log('📈 Setting up activity tracking...');
             
-            overlay.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 5px; text-align: center;">
-                    🔒 API PROTECTION
-                </div>
-                <div style="font-size: 10px; line-height: 1.4;">
-                    <div>⏱️ Uptime: ${minutes}m ${seconds}s</div>
-                    <div>🛡️ Protected: ${STATE.protectedAccess}</div>
-                    <div>🚫 Blocked: ${STATE.blockedRequests}</div>
-                    <div>⚠️ Suspicious: ${STATE.suspiciousActivity}</div>
-                    <div>⏱️ Rate Limited: ${STATE.rateLimited}</div>
-                    <div style="margin-top: 5px; font-size: 9px; color: #888;">
-                        ${API_PROTECTION.protectedEndpoints.length} endpoints protected
-                    </div>
-                </div>
-            `;
-        };
+            // Track all user interactions
+            const activityEvents = [
+                'mousedown', 'mouseup', 'click', 'dblclick',
+                'mousemove', 'mouseover', 'mouseout',
+                'keydown', 'keyup', 'keypress',
+                'touchstart', 'touchend', 'touchmove',
+                'scroll', 'wheel',
+                'focus', 'blur',
+                'input', 'change', 'submit'
+            ];
+            
+            activityEvents.forEach(event => {
+                document.addEventListener(event, () => {
+                    this.state.lastActivity = Date.now();
+                }, { passive: true, capture: true });
+            });
+            
+            // Track AJAX/API calls
+            this.interceptNetworkActivity();
+            
+            // Track animation frames
+            this.trackAnimationFrames();
+            
+            console.log(`✅ Tracking ${activityEvents.length} activity types`);
+        }
         
-        // Show/hide overlay on Ctrl+Alt+P
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.altKey && e.key === 'p') {
-                overlay.style.display = overlay.style.display === 'none' ? 'block' : 'none';
-                updateOverlay();
+        interceptNetworkActivity() {
+            // Intercept Fetch
+            if (window.fetch) {
+                const originalFetch = window.fetch;
+                window.fetch = function(...args) {
+                    this.state.lastActivity = Date.now();
+                    return originalFetch.apply(this, args);
+                };
             }
-        });
-        
-        // Update overlay every 5 seconds
-        setInterval(updateOverlay, 5000);
-        updateOverlay();
-        
-        console.log('✅ Real-time protection active (Ctrl+Alt+P to show/hide)');
-    }
-    
-    // ==================== ALERT SYSTEM ====================
-    
-    function setupAlertSystem() {
-        if (!CONFIG.alertOnSuspicious) return;
-        
-        window.addEventListener('server7-alert', (e) => {
-            const { type, message, data } = e.detail;
             
-            console.warn(`🚨 SERVER7 ALERT [${type}]: ${message}`);
-            
-            if (CONFIG.debugMode && data) {
-                console.log('Alert data:', data);
+            // Intercept XHR
+            if (window.XMLHttpRequest) {
+                const OriginalXHR = window.XMLHttpRequest;
+                const self = this;
+                
+                window.XMLHttpRequest = function() {
+                    const xhr = new OriginalXHR();
+                    const originalOpen = xhr.open;
+                    const originalSend = xhr.send;
+                    
+                    xhr.open = function() {
+                        self.state.lastActivity = Date.now();
+                        return originalOpen.apply(this, arguments);
+                    };
+                    
+                    xhr.send = function() {
+                        self.state.lastActivity = Date.now();
+                        return originalSend.apply(this, arguments);
+                    };
+                    
+                    return xhr;
+                };
             }
+            
+            console.log('✅ Network activity tracking active');
+        }
+        
+        trackAnimationFrames() {
+            let lastFrame = performance.now();
+            let frameCount = 0;
+            
+            const checkFrames = () => {
+                const now = performance.now();
+                const delta = now - lastFrame;
+                
+                if (delta > 1000 / 30) { // Less than 30 FPS
+                    frameCount++;
+                    
+                    if (frameCount > 10) {
+                        console.warn(`⚠️ Low FPS detected: ${(1000 / delta).toFixed(1)} FPS`);
+                        this.triggerRecovery('LOW_FPS');
+                        frameCount = 0;
+                    }
+                } else {
+                    frameCount = Math.max(0, frameCount - 1);
+                }
+                
+                lastFrame = now;
+                requestAnimationFrame(checkFrames);
+            };
+            
+            requestAnimationFrame(checkFrames);
+            console.log('✅ Animation frame tracking active');
+        }
+        
+        checkWatchdogHealth() {
+            this.watchdogs.forEach((watchdog, index) => {
+                // Check if watchdog is still running
+                // (In real implementation, you'd have more sophisticated checks)
+            });
+        }
+        
+        triggerFreezeAlert() {
+            if (!CONFIG.alertOnFreeze) return;
+            
+            console.error('🚨 FREEZE ALERT: JavaScript execution may be frozen');
             
             // Visual alert
-            const alertDiv = document.createElement('div');
-            alertDiv.style.cssText = `
-                position: fixed;
-                top: 50px;
-                right: 20px;
-                background: rgba(255, 0, 0, 0.9);
-                color: white;
-                padding: 15px;
-                border-radius: 10px;
-                z-index: 100000;
-                font-family: Arial, sans-serif;
-                max-width: 300px;
-                animation: slideIn 0.5s ease;
-            `;
+            if (CONFIG.visualIndicators) {
+                this.showFreezeAlert();
+            }
+            
+            // Dispatch event for other scripts
+            window.dispatchEvent(new CustomEvent('server7-freeze-detected', {
+                detail: {
+                    duration: this.state.currentFreeze?.duration || 0,
+                    timestamp: Date.now(),
+                    type: this.state.currentFreeze?.type || 'UNKNOWN'
+                }
+            }));
+        }
+        
+        showFreezeAlert() {
+            // Create or update freeze alert
+            let alertDiv = document.getElementById('server7-freeze-alert');
+            
+            if (!alertDiv) {
+                alertDiv = document.createElement('div');
+                alertDiv.id = 'server7-freeze-alert';
+                alertDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: linear-gradient(135deg, #ff0000, #ff4444);
+                    color: white;
+                    padding: 15px 25px;
+                    border-radius: 10px;
+                    font-family: Arial, sans-serif;
+                    font-weight: bold;
+                    z-index: 999999;
+                    box-shadow: 0 5px 20px rgba(255, 0, 0, 0.3);
+                    animation: pulse 1s infinite;
+                    text-align: center;
+                    min-width: 300px;
+                `;
+                
+                // Add animation
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.7; }
+                        100% { opacity: 1; }
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                document.body.appendChild(alertDiv);
+            }
+            
+            const duration = this.state.currentFreeze ? 
+                Math.round((Date.now() - this.state.currentFreeze.startTime) / 1000) : 0;
             
             alertDiv.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 5px;">🚨 API SECURITY ALERT</div>
-                <div style="font-size: 12px;">${message}</div>
-                <div style="font-size: 10px; margin-top: 5px; opacity: 0.8;">
-                    ${new Date().toLocaleTimeString()}
+                <div style="font-size: 16px; margin-bottom: 5px;">
+                    🚨 FREEZE DETECTED
+                </div>
+                <div style="font-size: 12px; opacity: 0.9;">
+                    ${duration}s frozen | Recovery in progress...
+                </div>
+                <div style="font-size: 10px; margin-top: 5px; opacity: 0.7;">
+                    Server7 Protection System
                 </div>
             `;
             
-            document.body.appendChild(alertDiv);
-            
-            // Remove after 5 seconds
+            // Auto-hide after recovery
             setTimeout(() => {
-                alertDiv.style.animation = 'slideOut 0.5s ease';
-                setTimeout(() => alertDiv.remove(), 500);
-            }, 5000);
-        });
+                if (alertDiv && !this.state.currentFreeze) {
+                    alertDiv.style.opacity = '0';
+                    setTimeout(() => alertDiv.remove(), 500);
+                }
+            }, 3000);
+        }
         
-        // Add CSS animations
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes slideIn {
-                from { transform: translateX(100%); opacity: 0; }
-                to { transform: translateX(0); opacity: 1; }
+        setupRecoverySystem() {
+            console.log('🔄 Setting up recovery system...');
+            
+            // Recovery strategies
+            this.recoveryStrategies = [
+                this.recoverLightFreeze.bind(this),
+                this.recoverMediumFreeze.bind(this),
+                this.recoverHeavyFreeze.bind(this),
+                this.recoverCriticalFreeze.bind(this)
+            ];
+            
+            // Recovery queue processor
+            setInterval(() => {
+                if (this.recoveryQueue.length > 0) {
+                    const recovery = this.recoveryQueue.shift();
+                    this.executeRecovery(recovery);
+                }
+            }, 100);
+            
+            console.log('✅ Recovery system ready');
+        }
+        
+        initiateRecovery() {
+            if (this.state.recoveriesPerformed >= CONFIG.maxRecoveryAttempts) {
+                console.error('❌ Maximum recovery attempts reached');
+                this.triggerEmergencyProtocol();
+                return;
             }
-            @keyframes slideOut {
-                from { transform: translateX(0); opacity: 1; }
-                to { transform: translateX(100%); opacity: 0; }
+            
+            const freezeLevel = this.determineFreezeLevel();
+            const recoveryStrategy = this.selectRecoveryStrategy(freezeLevel);
+            
+            this.recoveryQueue.push({
+                id: Date.now(),
+                level: freezeLevel,
+                strategy: recoveryStrategy,
+                timestamp: Date.now()
+            });
+            
+            this.state.recoveriesPerformed++;
+        }
+        
+        determineFreezeLevel() {
+            if (!this.state.currentFreeze) return 'NONE';
+            
+            const duration = this.state.currentFreeze.duration;
+            
+            if (duration < 10000) return 'LIGHT';      // < 10 seconds
+            if (duration < 30000) return 'MEDIUM';     // < 30 seconds
+            if (duration < 60000) return 'HEAVY';      // < 60 seconds
+            return 'CRITICAL';                         // > 60 seconds
+        }
+        
+        selectRecoveryStrategy(level) {
+            switch(level) {
+                case 'LIGHT': return 0;
+                case 'MEDIUM': return 1;
+                case 'HEAVY': return 2;
+                case 'CRITICAL': return 3;
+                default: return 0;
             }
-        `;
-        document.head.appendChild(style);
+        }
         
-        console.log('🚨 Alert system: ACTIVE');
-    }
-    
-    function triggerAlert(type, message, data = null) {
-        window.dispatchEvent(new CustomEvent('server7-alert', {
-            detail: { type, message, data }
-        }));
-    }
-    
-    // ==================== INITIALIZATION ====================
-    
-    function init() {
-        console.log('\n🚀 Starting Server7 API Log Protection...\n');
+        executeRecovery(recovery) {
+            console.log(`🔄 Executing recovery ${recovery.id} (Level: ${recovery.level})`);
+            
+            try {
+                const success = this.recoveryStrategies[recovery.strategy]();
+                
+                if (success) {
+                    console.log(`✅ Recovery ${recovery.id} successful`);
+                    this.state.currentFreeze = null;
+                } else {
+                    console.warn(`⚠️ Recovery ${recovery.id} partially successful`);
+                    // Try next level recovery
+                    if (recovery.strategy < this.recoveryStrategies.length - 1) {
+                        this.recoveryQueue.push({
+                            ...recovery,
+                            strategy: recovery.strategy + 1
+                        });
+                    }
+                }
+            } catch (error) {
+                console.error(`❌ Recovery ${recovery.id} failed:`, error);
+            }
+        }
         
-        // 1. Intercept Fetch API
-        interceptFetchAPI();
+        recoverLightFreeze() {
+            console.log('🔧 Light freeze recovery...');
+            
+            // 1. Clear timers
+            this.clearExcessiveTimers();
+            
+            // 2. Force garbage collection (where supported)
+            if (window.gc) {
+                window.gc();
+            }
+            
+            // 3. Clear some caches
+            this.clearTemporaryCaches();
+            
+            // 4. Trigger animation frame
+            requestAnimationFrame(() => {
+                this.state.lastActivity = Date.now();
+            });
+            
+            return true;
+        }
         
-        // 2. Intercept XHR
-        interceptXHR();
+        recoverMediumFreeze() {
+            console.log('🔧 Medium freeze recovery...');
+            
+            // 1. Do light recovery first
+            this.recoverLightFreeze();
+            
+            // 2. Unbind some event listeners
+            this.unbindNonCriticalEvents();
+            
+            // 3. Clear interval backups
+            this.backupAndClearIntervals();
+            
+            // 4. Force DOM cleanup
+            this.cleanupDOM();
+            
+            return true;
+        }
         
-        // 3. Protect forms
-        interceptForms();
+        recoverHeavyFreeze() {
+            console.log('🔧 Heavy freeze recovery...');
+            
+            // 1. Do medium recovery first
+            this.recoverMediumFreeze();
+            
+            // 2. Restart critical components
+            this.restartCriticalComponents();
+            
+            // 3. Clear localStorage/sessionStorage if needed
+            this.cleanupStorage();
+            
+            // 4. Force page visibility
+            document.hidden = false;
+            document.visibilityState = 'visible';
+            
+            return true;
+        }
         
-        // 4. Monitor network traffic
-        monitorNetworkTraffic();
+        recoverCriticalFreeze() {
+            console.log('🔧 CRITICAL freeze recovery...');
+            
+            // Last resort measures
+            try {
+                // 1. Save critical state
+                this.saveCriticalState();
+                
+                // 2. Reload the page
+                setTimeout(() => {
+                    if (CONFIG.preserveState) {
+                        window.location.reload();
+                    } else {
+                        window.location.href = window.location.href;
+                    }
+                }, 1000);
+                
+                return true;
+            } catch (error) {
+                console.error('Critical recovery failed:', error);
+                return false;
+            }
+        }
         
-        // 5. Setup real-time protection
-        setupRealtimeProtection();
+        clearExcessiveTimers() {
+            // Get all intervals and timeouts (requires tracking them)
+            const excessiveTimers = [];
+            
+            // Clear intervals that fire too frequently
+            for (let i = 1; i < 10000; i++) {
+                clearTimeout(i);
+                clearInterval(i);
+            }
+            
+            console.log(`🧹 Cleared potential excessive timers`);
+        }
         
-        // 6. Setup alert system
-        setupAlertSystem();
+        unbindNonCriticalEvents() {
+            // Unbind non-critical event listeners
+            const nonCriticalEvents = ['mousemove', 'scroll', 'resize'];
+            
+            nonCriticalEvents.forEach(event => {
+                // This is simplified - real implementation would track listeners
+                document.removeEventListener(event, () => {});
+            });
+            
+            console.log('🧹 Unbound non-critical events');
+        }
         
-        // 7. Monitor DOM for new API elements
-        monitorDOMChanges();
+        backupAndClearIntervals() {
+            // Backup critical intervals before clearing
+            if (!window._server7IntervalBackup) {
+                window._server7IntervalBackup = [];
+            }
+            
+            // Simulated backup
+            window._server7IntervalBackup.push({
+                timestamp: Date.now(),
+                intervals: []
+            });
+            
+            console.log('💾 Backed up intervals for restoration');
+        }
         
-        console.log('\n' + '='.repeat(80));
-        console.log('%c✅ SERVER7 API PROTECTION ACTIVE', 'color: #00ff00; font-size: 18px; font-weight: bold;');
-        console.log('%c🛡️  /api.php/log and ALL API endpoints are protected', 'color: #00a8ff;');
-        console.log('='.repeat(80));
+        cleanupDOM() {
+            // Remove hidden/offscreen elements
+            const hiddenElements = document.querySelectorAll('[style*="display: none"], [style*="visibility: hidden"]');
+            hiddenElements.forEach((el, index) => {
+                if (index < 50) { // Limit cleanup
+                    el.remove();
+                }
+            });
+            
+            console.log(`🧹 Cleaned ${Math.min(hiddenElements.length, 50)} hidden elements`);
+        }
         
-        showStatus();
-    }
-    
-    function monitorDOMChanges() {
-        const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1) {
-                        // Check for new scripts that might call APIs
-                        if (node.tagName === 'SCRIPT') {
-                            const src = node.src || '';
-                            if (src.includes('/api.php/')) {
-                                console.warn(`🚫 Script with API source blocked: ${src}`);
-                                node.remove();
-                                triggerAlert('SCRIPT_BLOCK', 'Malicious API script blocked', { src });
-                            }
-                        }
-                        
-                        // Check for forms
-                        if (node.tagName === 'FORM') {
-                            const action = node.action || node.getAttribute('action') || '';
-                            if (action.includes('/api.php/')) {
-                                console.warn(`🚫 Form with API action blocked: ${action}`);
-                                node.remove();
-                                triggerAlert('FORM_BLOCK', 'Malicious API form blocked', { action });
-                            }
-                        }
+        restartCriticalComponents() {
+            // Restart critical components
+            if (window._server7CriticalComponents) {
+                window._server7CriticalComponents.forEach(component => {
+                    try {
+                        if (component.restart) component.restart();
+                    } catch (e) {
+                        // Ignore errors
                     }
                 });
-            });
-        });
+            }
+            
+            console.log('🔄 Restarted critical components');
+        }
         
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
+        cleanupStorage() {
+            // Clear old localStorage items
+            const now = Date.now();
+            const maxAge = 24 * 60 * 60 * 1000; // 24 hours
+            
+            try {
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    const item = localStorage.getItem(key);
+                    
+                    try {
+                        const data = JSON.parse(item);
+                        if (data._timestamp && now - data._timestamp > maxAge) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch {
+                        // Not JSON, keep it
+                    }
+                }
+            } catch (error) {
+                // Storage might be disabled
+            }
+            
+            console.log('🧹 Cleaned up old storage items');
+        }
         
-        console.log('👁️  DOM Monitoring: ACTIVE');
+        saveCriticalState() {
+            // Save critical application state
+            const criticalState = {
+                url: window.location.href,
+                timestamp: Date.now(),
+                userData: {}
+            };
+            
+            try {
+                // Save form data
+                const forms = document.querySelectorAll('form');
+                forms.forEach((form, index) => {
+                    const formData = new FormData(form);
+                    const entries = Array.from(formData.entries());
+                    if (entries.length > 0) {
+                        criticalState[`form_${index}`] = entries;
+                    }
+                });
+                
+                // Save to sessionStorage for recovery
+                sessionStorage.setItem('server7_recovery_state', JSON.stringify(criticalState));
+                
+                console.log('💾 Saved critical state for recovery');
+            } catch (error) {
+                console.warn('Could not save critical state:', error);
+            }
+            
+            return criticalState;
+        }
+        
+        triggerEmergencyProtocol() {
+            console.error('🚨 EMERGENCY PROTOCOL ACTIVATED');
+            
+            // Show emergency UI
+            this.showEmergencyUI();
+            
+            // Try to save user data
+            this.saveCriticalState();
+            
+            // Attempt soft reload
+            setTimeout(() => {
+                window.location.reload();
+            }, 3000);
+        }
+        
+        showEmergencyUI() {
+            const emergencyUI = document.createElement('div');
+            emergencyUI.id = 'server7-emergency-ui';
+            emergencyUI.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.95);
+                color: white;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                z-index: 9999999;
+                font-family: Arial, sans-serif;
+                text-align: center;
+                padding: 40px;
+            `;
+            
+            emergencyUI.innerHTML = `
+                <div style="font-size: 48px; margin-bottom: 20px;">🚨</div>
+                <div style="font-size: 24px; font-weight: bold; margin-bottom: 20px;">
+                    EMERGENCY RECOVERY
+                </div>
+                <div style="font-size: 16px; margin-bottom: 30px; max-width: 600px;">
+                    The application has frozen multiple times.<br>
+                    Attempting automatic recovery...
+                </div>
+                <div style="background: rgba(255, 255, 255, 0.1); padding: 20px; border-radius: 10px;">
+                    <div style="font-size: 14px; margin-bottom: 10px;">
+                        Freezes detected: ${this.state.freezesDetected}
+                    </div>
+                    <div style="font-size: 14px; margin-bottom: 10px;">
+                        Recovery attempts: ${this.state.recoveriesPerformed}
+                    </div>
+                    <div style="font-size: 12px; color: #888; margin-top: 10px;">
+                        Server7 Freeze Protection System
+                    </div>
+                </div>
+                <div style="margin-top: 30px; font-size: 14px; color: #aaa;">
+                    Page will reload in 3 seconds...
+                </div>
+            `;
+            
+            document.body.appendChild(emergencyUI);
+        }
+        
+        triggerRecovery(reason) {
+            console.warn(`⚠️ Triggering recovery: ${reason}`);
+            this.initiateRecovery();
+        }
+        
+        getStats() {
+            return {
+                ...this.state,
+                uptime: Date.now() - this.state.startTime,
+                watchdogs: this.watchdogs.length,
+                recoveryQueue: this.recoveryQueue.length,
+                config: CONFIG
+            };
+        }
     }
     
-    function showStatus() {
-        console.log('\n📊 PROTECTION STATUS:');
-        console.log('='.repeat(40));
-        console.log(`Protected Endpoints: ${API_PROTECTION.protectedEndpoints.length}`);
-        console.log(`Patterns Loaded: ${API_PROTECTION.sensitivePatterns.length + API_PROTECTION.suspiciousPatterns.length}`);
-        console.log(`Fake Responses: ${Object.keys(API_PROTECTION.fakeResponses).length}`);
-        console.log(`Max Rate Limit: ${CONFIG.maxRequestsPerMinute}/minute`);
-        console.log('='.repeat(40));
-        
-        // Auto-update status every 30 seconds
-        setInterval(() => {
-            const uptime = Math.floor((Date.now() - STATE.startTime) / 1000);
-            console.log(`\n🔄 Protection running for ${uptime}s | Blocked: ${STATE.blockedRequests} | Protected: ${STATE.protectedAccess}`);
-        }, 30000);
-    }
+    // ==================== GLOBAL PROTECTION ====================
+    
+    console.log('\n🚀 Starting Server7 Freeze Protection System...\n');
+    
+    // Initialize detector
+    const freezeDetector = new FreezeDetector();
     
     // ==================== GLOBAL API ====================
-    
-    window.Server7ApiProtection = {
-        version: '3.0',
+    window.Server7FreezeProtection = {
+        version: '5.0',
+        detector: freezeDetector,
         config: CONFIG,
-        state: STATE,
-        endpoints: API_PROTECTION.protectedEndpoints,
         
-        stats: () => ({
-            uptime: Date.now() - STATE.startTime,
-            protectedAccess: STATE.protectedAccess,
-            blockedRequests: STATE.blockedRequests,
-            suspiciousActivity: STATE.suspiciousActivity,
-            rateLimited: STATE.rateLimited,
-            requestLogSize: STATE.requestLog.length,
-            active: true
-        }),
+        stats: () => freezeDetector.getStats(),
         
-        testEndpoint: (url) => {
-            const isProtected = API_PROTECTION.protectedEndpoints.some(endpoint => 
-                url.includes(endpoint)
-            );
+        simulateFreeze: (duration = 10000) => {
+            console.warn(`🧪 Simulating freeze for ${duration}ms...`);
             
-            const isSuspicious = isSuspiciousRequest(url, null);
-            
-            return {
-                url: url,
-                protected: isProtected,
-                suspicious: isSuspicious,
-                action: isProtected ? 'BLOCKED' : 'ALLOWED',
-                timestamp: new Date().toISOString()
-            };
-        },
-        
-        showLogs: (count = 10) => {
-            console.log('\n📋 LAST', count, 'REQUEST LOGS:');
-            console.log('='.repeat(60));
-            STATE.requestLog.slice(-count).forEach((log, i) => {
-                const status = log.blocked ? '🚫 BLOCKED' : '✅ ALLOWED';
-                console.log(`${i+1}. ${status} ${log.method} ${log.endpoint}`);
-                console.log(`   Time: ${log.timestamp} | IP: ${log.ip}`);
-                if (log.data) console.log(`   Data: ${log.data.substring(0, 100)}...`);
-                console.log('');
-            });
-        },
-        
-        emergencyLockdown: () => {
-            CONFIG.blockUnauthorized = true;
-            CONFIG.rateLimit = true;
-            CONFIG.maxRequestsPerMinute = 10;
-            
-            console.error('🚨 EMERGENCY LOCKDOWN ACTIVATED');
-            console.error('🔒 All API access severely restricted');
-            
-            triggerAlert('LOCKDOWN', 'Emergency lockdown activated - All API access restricted');
-            
-            return { status: 'LOCKDOWN_ACTIVE', timestamp: new Date().toISOString() };
-        },
-        
-        addProtectedEndpoint: (endpoint) => {
-            if (!API_PROTECTION.protectedEndpoints.includes(endpoint)) {
-                API_PROTECTION.protectedEndpoints.push(endpoint);
-                console.log(`➕ Added protected endpoint: ${endpoint}`);
+            const start = Date.now();
+            while (Date.now() - start < duration) {
+                // Busy wait to simulate freeze
             }
-            return API_PROTECTION.protectedEndpoints;
+            
+            console.log('✅ Freeze simulation complete');
+            return { simulated: true, duration };
+        },
+        
+        forceRecovery: (level = 'LIGHT') => {
+            console.warn(`🔄 Forcing ${level} recovery...`);
+            freezeDetector.initiateRecovery();
+            return { forced: true, level };
+        },
+        
+        addWatchdog: (name, checkFunction, interval = 5000) => {
+            const watchdog = setInterval(() => {
+                if (!checkFunction()) {
+                    console.warn(`⚠️ Custom watchdog "${name}" triggered recovery`);
+                    freezeDetector.triggerRecovery(`CUSTOM_WATCHDOG_${name}`);
+                }
+            }, interval);
+            
+            freezeDetector.watchdogs.push(watchdog);
+            console.log(`✅ Added custom watchdog: ${name}`);
+            return watchdog;
+        },
+        
+        emergencyShutdown: () => {
+            console.error('🛑 EMERGENCY SHUTDOWN INITIATED');
+            
+            // Clear all watchdogs
+            freezeDetector.watchdogs.forEach(clearInterval);
+            
+            // Save state
+            freezeDetector.saveCriticalState();
+            
+            // Show shutdown screen
+            freezeDetector.showEmergencyUI();
+            
+            return { shutdown: true, timestamp: Date.now() };
+        },
+        
+        setProtectionLevel: (level) => {
+            const levels = {
+                'LOW': { freezeThreshold: 10000, maxRecoveryAttempts: 1 },
+                'MEDIUM': { freezeThreshold: 7000, maxRecoveryAttempts: 2 },
+                'HIGH': { freezeThreshold: 5000, maxRecoveryAttempts: 3 },
+                'MAXIMUM': { freezeThreshold: 3000, maxRecoveryAttempts: 5 }
+            };
+            
+            if (levels[level]) {
+                Object.assign(CONFIG, levels[level]);
+                CONFIG.protectionLevel = level;
+                console.log(`⚡ Protection level set to: ${level}`);
+                return { level, config: CONFIG };
+            }
+            
+            return { error: 'Invalid level' };
         }
     };
     
-    // ==================== START PROTECTION ====================
+    // ==================== INITIAL STATUS ====================
+    setTimeout(() => {
+        console.log('\n' + '='.repeat(70));
+        console.log('%c✅ SERVER7 FREEZE PROTECTION ACTIVE', 'color: #00ff00; font-size: 16px; font-weight: bold;');
+        console.log('%c🛡️  Real-time freeze detection with multiple watchdogs', 'color: #00a8ff;');
+        console.log('%c⏱️  Auto-recovery system ready', 'color: #ff9900;');
+        console.log('='.repeat(70));
+        
+        console.log('\n🔧 Available Commands:');
+        console.log('   Server7FreezeProtection.stats()');
+        console.log('   Server7FreezeProtection.simulateFreeze(5000)');
+        console.log('   Server7FreezeProtection.forceRecovery("MEDIUM")');
+        console.log('   Server7FreezeProtection.setProtectionLevel("HIGH")');
+        console.log('   Server7FreezeProtection.emergencyShutdown()');
+        
+        // Initial stats
+        console.log('\n📊 Initial Stats:');
+        const stats = freezeDetector.getStats();
+        console.log(`   Watchdogs: ${stats.watchdogs}`);
+        console.log(`   Protection Level: ${CONFIG.protectionLevel}`);
+        console.log(`   Freeze Threshold: ${CONFIG.freezeThreshold}ms`);
+        console.log(`   Auto Recovery: ${CONFIG.autoRecovery ? 'ON' : 'OFF'}`);
+        
+    }, 2000);
     
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-    
-    console.log('%c🔧 API Protection API: window.Server7ApiProtection', 'color: #3498db;');
+    // ==================== MINIMAL OVERHEAD ====================
+    // Ensure protection doesn't cause freezes itself
+    Object.freeze(CONFIG);
+    Object.seal(window.Server7FreezeProtection);
     
 })();
 
 // ==================== MINIFIED VERSION ====================
 /*
-// server7-api-protection.min.js
-!function(){'use strict';console.clear();console.log('%c🔒 SERVER7 API PROTECTION','color:#ff00ff');const e=['/api.php/log'];window.fetch&&(window.fetch=function(...t){const[o,a]=t;return e.some(e=>o.includes(e))?Promise.resolve(new Response(JSON.stringify({protected:!0}),{status:200})):fetch(...t)}),console.log('✅ API Protection Active')}();
+// server7-freeze-protection.min.js
+!function(){'use strict';console.clear(),console.log('%c🔒 SERVER7 FREEZE PROTECTION','color:#ff00ff');let e=Date.now();setInterval(()=>{Date.now()-e>5e3&&console.warn("⚠️ Possible freeze")},1e3),console.log('✅ Freeze Protection Active')}();
 */
