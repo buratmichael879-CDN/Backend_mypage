@@ -1,437 +1,771 @@
-/**
- * STATUS 200 FORCER - 100% WORKING
- * Forces all page loads to appear as 200 OK
- * Works on ALL browsers
- */
-
-// ==================== IMMEDIATE EXECUTION ====================
-(function() {
-    'use strict';
+// server7-image-protection.js - COMPLETE VERSION
+class Server7ImageProtector {
+    constructor(options = {}) {
+        // Schutz-Status
+        this.protectedImages = new WeakMap();
+        this.originalSources = new Map();
+        this.encryptedSources = new Map();
+        this.observer = null;
+        
+        // Konfiguration
+        this.options = {
+            protectPNG: true,
+            protectSVG: true,
+            protectJPG: true,
+            protectGIF: true,
+            protectWEBP: true,
+            protectAll: true,
+            enableWatermark: false, // Digitales Wasserzeichen
+            preventDownload: true,
+            preventRightClick: true,
+            preventInspect: true,
+            lazyLoad: true,
+            blurUnloaded: true,
+            addTimestamps: true,
+            cacheBusting: true,
+            encryption: false, // Experimentell
+            maxRetries: 3,
+            retryDelay: 1000,
+            debug: false,
+            ...options
+        };
+        
+        // Bild-Erkennung
+        this.imageExtensions = /\.(png|svg|jpg|jpeg|gif|webp|bmp|tiff|ico|avif|jfif)(\?.*)?$/i;
+        this.dataUrlPattern = /^data:image\/(png|svg\+xml|jpeg|gif|webp|bmp|tiff);base64,/i;
+        this.svgPattern = /\.svg(\?.*)?$/i;
+        this.externalUrlPattern = /^https?:\/\//i;
+        
+        // Watermark Canvas
+        this.watermarkCanvas = null;
+        this.watermarkCache = new Map();
+        
+        // Performance Tracking
+        this.performance = {
+            startTime: Date.now(),
+            imagesProtected: 0,
+            errors: 0,
+            blockedAttempts: 0
+        };
+        
+        this.init();
+    }
     
-    console.clear();
-    console.log('%c✅ STATUS 200 FORCER v1.0', 'color: #00ff00; font-size: 20px; font-weight: bold;');
-    console.log('%c🔄 All pages forced to 200 OK status', 'color: #00a8ff;');
-    console.log('========================================\n');
+    // ==================== INITIALISIERUNG ====================
     
-    // ==================== QUICK START - NO ERRORS ====================
-    try {
-        // 1. IMMEDIATELY CHANGE PAGE TITLE IF IT CONTAINS ERRORS
-        const errorTitles = ['404', '500', 'Error', 'Not Found', 'Forbidden', 'Unauthorized'];
-        errorTitles.forEach(error => {
-            if (document.title.includes(error)) {
-                document.title = 'Page Loaded Successfully';
+    init() {
+        console.log('🛡️ Server7 Image Protection v2.0 initialisiert');
+        
+        // Warte auf DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.startProtection());
+        } else {
+            this.startProtection();
+        }
+        
+        // Global verfügbar machen
+        window.server7ImageProtector = this;
+    }
+    
+    startProtection() {
+        console.log('🚀 Starte Bildschutz...');
+        
+        // 1. Vorhandene Bilder schützen
+        this.protectExistingImages();
+        
+        // 2. Observer für neue Bilder
+        this.setupMutationObserver();
+        
+        // 3. Event Listener
+        this.setupEventListeners();
+        
+        // 4. Performance Monitoring
+        this.setupPerformanceMonitor();
+        
+        // 5. Periodic Check
+        this.setupPeriodicCheck();
+        
+        console.log('✅ Bildschutz aktiv - Alle Bilder werden geschützt');
+    }
+    
+    // ==================== BILD-ERKENNUNG ====================
+    
+    isImageElement(element) {
+        const tag = element.tagName.toLowerCase();
+        return tag === 'img' || 
+               tag === 'image' || 
+               tag === 'picture' ||
+               element.style.backgroundImage ||
+               element.hasAttribute('data-img') ||
+               element.classList.contains('image-container');
+    }
+    
+    getImageSource(element) {
+        if (element.tagName.toLowerCase() === 'img') {
+            return element.src || 
+                   element.dataset.src ||
+                   element.getAttribute('data-original') ||
+                   element.currentSrc;
+        }
+        
+        if (element.tagName.toLowerCase() === 'image') {
+            return element.href?.baseVal || 
+                   element.getAttribute('xlink:href') ||
+                   element.getAttribute('href');
+        }
+        
+        if (element.style.backgroundImage) {
+            const match = element.style.backgroundImage.match(/url\(["']?([^"']+)["']?\)/i);
+            return match ? match[1] : null;
+        }
+        
+        // Für CSS Klassen und Data-Attribute
+        if (element.dataset.bg) return element.dataset.bg;
+        if (element.dataset.image) return element.dataset.image;
+        if (element.dataset.srcset) return element.dataset.srcset.split(',')[0].split(' ')[0];
+        
+        return null;
+    }
+    
+    shouldProtectImage(src) {
+        if (!src || typeof src !== 'string') return false;
+        
+        // Data URLs immer schützen
+        if (this.dataUrlPattern.test(src)) {
+            return true;
+        }
+        
+        // Externe URLs prüfen
+        if (this.externalUrlPattern.test(src)) {
+            const url = new URL(src);
+            const path = url.pathname.toLowerCase();
+            
+            // Prüfe nach Bild-Endungen
+            if (this.imageExtensions.test(path)) {
+                const ext = path.match(this.imageExtensions)[1];
+                
+                // Prüfe Optionen
+                if (ext === 'png' && this.options.protectPNG) return true;
+                if (ext === 'svg' && this.options.protectSVG) return true;
+                if ((ext === 'jpg' || ext === 'jpeg') && this.options.protectJPG) return true;
+                if (ext === 'gif' && this.options.protectGIF) return true;
+                if (ext === 'webp' && this.options.protectWEBP) return true;
+                if (this.options.protectAll) return true;
             }
+        }
+        
+        // Relative Pfade
+        if (this.imageExtensions.test(src.split('?')[0])) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // ==================== HAUPT-SCHUTZFUNKTIONEN ====================
+    
+    protectExistingImages() {
+        // Finde alle Bilder
+        const selectors = [
+            'img',
+            'image',
+            'picture',
+            '[style*="background-image"]',
+            '[data-bg]',
+            '[data-image]',
+            '[data-src]',
+            '.lazy',
+            '.lazy-load',
+            '.image',
+            '.photo',
+            '.img',
+            '.bg-image'
+        ];
+        
+        const images = document.querySelectorAll(selectors.join(', '));
+        console.log(`📸 ${images.length} Bilder gefunden`);
+        
+        images.forEach((img, index) => {
+            this.protectSingleImage(img, index);
         });
-        
-        // 2. IMMEDIATELY CHANGE URL IN ADDRESS BAR
-        if (window.history && window.history.replaceState) {
-            const cleanURL = window.location.href
-                .replace(/error/gi, '')
-                .replace(/404/gi, '')
-                .replace(/500/gi, '')
-                .replace(/forbidden/gi, '');
-            
-            if (cleanURL !== window.location.href) {
-                window.history.replaceState({}, document.title, cleanURL);
-                console.log('✅ URL cleaned in address bar');
+    }
+    
+    protectSingleImage(element, delayIndex = 0) {
+        try {
+            // Prüfe ob bereits geschützt
+            if (this.protectedImages.has(element)) {
+                return;
             }
+            
+            // Prüfe ob es ein Bild ist
+            if (!this.isImageElement(element)) {
+                return;
+            }
+            
+            // Hole Quelle
+            const originalSrc = this.getImageSource(element);
+            if (!originalSrc) {
+                return;
+            }
+            
+            // Prüfe ob Schutz benötigt wird
+            if (!this.shouldProtectImage(originalSrc)) {
+                if (this.options.debug) console.log(`ℹ️ Bild nicht geschützt: ${originalSrc.substring(0, 50)}`);
+                return;
+            }
+            
+            // Verzögerung für Performance
+            setTimeout(() => {
+                this.applyProtection(element, originalSrc);
+            }, delayIndex * 30);
+            
+        } catch (error) {
+            this.performance.errors++;
+            if (this.options.debug) console.error('Fehler beim Bildschutz:', error);
+        }
+    }
+    
+    applyProtection(element, originalSrc) {
+        try {
+            // Markiere als geschützt
+            this.protectedImages.set(element, {
+                timestamp: Date.now(),
+                originalSrc: originalSrc,
+                attempts: 0
+            });
+            
+            this.originalSources.set(element, originalSrc);
+            
+            // Wende Schutzmethoden an
+            this.applyProtectionMethods(element, originalSrc);
+            
+            // Erfolg tracken
+            this.performance.imagesProtected++;
+            
+            if (this.options.debug) {
+                console.log(`✅ Bild geschützt: ${element.tagName} - ${originalSrc.substring(0, 60)}...`);
+            }
+            
+        } catch (error) {
+            console.warn('Bildschutz fehlgeschlagen:', error);
+            this.performance.errors++;
+        }
+    }
+    
+    applyProtectionMethods(element, originalSrc) {
+        // 1. Source Manipulation
+        this.manipulateImageSource(element, originalSrc);
+        
+        // 2. Event Protection
+        this.addEventProtection(element);
+        
+        // 3. Visual Protection
+        this.addVisualProtection(element);
+        
+        // 4. Watermark (optional)
+        if (this.options.enableWatermark) {
+            this.addWatermark(element);
         }
         
-        // 3. IMMEDIATELY ADD SUCCESS INDICATOR
-        const successBadge = document.createElement('div');
-        successBadge.innerHTML = '✅ 200 OK';
-        successBadge.style.cssText = `
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            background: #00ff00;
-            color: black;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-family: monospace;
-            font-weight: bold;
-            z-index: 999999;
-            font-size: 12px;
-        `;
-        document.body.appendChild(successBadge);
-        
-        // 4. MAKE ALL LINKS SAFE
-        document.addEventListener('click', function(e) {
-            let target = e.target;
-            while (target && target.tagName !== 'A') {
-                target = target.parentElement;
-                if (!target) return;
+        // 5. Lazy Loading (optional)
+        if (this.options.lazyLoad) {
+            this.setupLazyLoading(element);
+        }
+    }
+    
+    // ==================== SCHUTZ-METHODEN ====================
+    
+    manipulateImageSource(element, originalSrc) {
+        if (element.tagName.toLowerCase() === 'img') {
+            // Cache Busting
+            let protectedSrc = originalSrc;
+            
+            if (this.options.cacheBusting) {
+                protectedSrc = this.addCacheBusting(originalSrc);
             }
             
-            if (target && target.href) {
-                const href = target.href.toLowerCase();
-                if (href.includes('error') || href.includes('404') || href.includes('500')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Redirect to current page instead
-                    window.location.href = window.location.origin + window.location.pathname;
-                    console.log('🚫 Blocked error link click');
-                    return false;
+            if (this.options.addTimestamps) {
+                protectedSrc = this.addTimestamp(protectedSrc);
+            }
+            
+            // Temporäre Attribute setzen
+            element.setAttribute('data-original-src', originalSrc);
+            element.setAttribute('data-protected', 'true');
+            element.setAttribute('data-protected-time', Date.now());
+            
+            // Encrypted Proxy (experimentell)
+            if (this.options.encryption) {
+                const encryptedSrc = this.encryptImageUrl(originalSrc);
+                this.encryptedSources.set(element, encryptedSrc);
+                element.setAttribute('data-encrypted', 'true');
+            }
+            
+            // Setze geschützte Quelle
+            setTimeout(() => {
+                if (element.src !== protectedSrc) {
+                    element.src = protectedSrc;
                 }
+            }, 10);
+            
+        } else if (element.style.backgroundImage) {
+            // Für Background Images
+            const protectedSrc = this.options.cacheBusting ? 
+                this.addCacheBusting(originalSrc) : originalSrc;
+            
+            element.style.setProperty('--original-bg', `url("${originalSrc}")`);
+            element.style.backgroundImage = `url("${protectedSrc}")`;
+            element.setAttribute('data-bg-protected', 'true');
+        }
+    }
+    
+    addCacheBusting(url) {
+        try {
+            if (url.includes('?')) {
+                return `${url}&_t=${Date.now()}`;
+            } else {
+                return `${url}?_t=${Date.now()}`;
             }
-        }, true);
-        
-        // 5. INTERCEPT ALL FETCH REQUESTS
-        if (window.fetch) {
-            const originalFetch = window.fetch;
-            window.fetch = function(...args) {
-                const [resource, options] = args;
-                
-                // Always return 200 response
-                return Promise.resolve()
-                    .then(() => {
-                        console.log(`📤 Fetch intercepted: ${typeof resource === 'string' ? resource.substring(0, 50) : 'Request'}`);
-                        
-                        // Create fake 200 response
-                        return new Response(JSON.stringify({
-                            status: 'success',
-                            message: '200 OK - Protected by Status Forcer',
-                            timestamp: new Date().toISOString()
-                        }), {
-                            status: 200,
-                            statusText: 'OK',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Status-Protected': 'true'
-                            }
-                        });
-                    })
-                    .catch(() => {
-                        // Even if there's an error, return success
-                        return new Response(JSON.stringify({
-                            status: 'success',
-                            message: 'Fallback 200 response'
-                        }), {
-                            status: 200,
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                    });
-            };
+        } catch {
+            return url;
         }
-        
-        // 6. INTERCEPT ALL XHR REQUESTS
-        if (window.XMLHttpRequest) {
-            const OriginalXHR = window.XMLHttpRequest;
-            window.XMLHttpRequest = function() {
-                const xhr = new OriginalXHR();
-                
-                // Store original methods
-                const originalOpen = xhr.open;
-                const originalSend = xhr.send;
-                const originalSetRequestHeader = xhr.setRequestHeader;
-                
-                // Override open
-                xhr.open = function(method, url) {
-                    console.log(`📤 XHR intercepted: ${url ? url.substring(0, 50) : 'Request'}`);
-                    return originalOpen.apply(this, arguments);
-                };
-                
-                // Override send to always return success
-                xhr.send = function(data) {
-                    try {
-                        // Force readyState changes to show success
-                        if (xhr.onreadystatechange) {
-                            xhr.readyState = 4;
-                            xhr.status = 200;
-                            xhr.statusText = 'OK';
-                            xhr.response = '{"status":"success"}';
-                            xhr.responseText = '{"status":"success"}';
-                            
-                            setTimeout(() => {
-                                if (xhr.onreadystatechange) {
-                                    xhr.onreadystatechange.call(xhr);
-                                }
-                                if (xhr.onload) {
-                                    xhr.onload.call(xhr);
-                                }
-                            }, 100);
-                        }
-                    } catch (e) {
-                        // Silent fail - still works
-                    }
-                    
-                    return originalSend.apply(this, arguments);
-                };
-                
-                return xhr;
-            };
+    }
+    
+    addTimestamp(url) {
+        const timestamp = Math.floor(Date.now() / 60000); // Minute-Genauigkeit
+        if (url.includes('?')) {
+            return `${url}&_protect=${timestamp}`;
+        } else {
+            return `${url}?_protect=${timestamp}`;
         }
-        
-        // 7. PROTECT PAGE NAVIGATION
-        const originalAssign = window.location.assign;
-        const originalReplace = window.location.replace;
-        const originalReload = window.location.reload;
-        const originalOpen = window.open;
-        
-        // Override location methods
-        window.location.assign = function(url) {
-            console.log(`🛡️ Blocked navigation to: ${url}`);
-            return originalReplace.call(window.location, window.location.href);
-        };
-        
-        window.location.replace = function(url) {
-            console.log(`🛡️ Blocked replace to: ${url}`);
-            return originalReplace.call(window.location, window.location.href);
-        };
-        
-        window.location.reload = function() {
-            console.log('🛡️ Blocked reload');
-            // Do nothing - stay on page
-            return;
-        };
-        
-        window.open = function(url) {
-            console.log(`🛡️ Blocked window.open to: ${url}`);
-            // Return current window instead
-            return window;
-        };
-        
-        // 8. PROTECT HISTORY API
-        if (window.history) {
-            const originalPushState = history.pushState;
-            const originalReplaceState = history.replaceState;
+    }
+    
+    encryptImageUrl(url) {
+        // Einfache URL "Verschlüsselung" (Base64)
+        try {
+            return `data:image/svg+xml;base64,${btoa(`<svg xmlns="http://www.w3.org/2000/svg">
+                <image href="${url}" width="100%" height="100%"/>
+                <text x="10" y="20" font-size="12" fill="red">🔒 PROTECTED</text>
+            </svg>`)}`;
+        } catch {
+            return url;
+        }
+    }
+    
+    addEventProtection(element) {
+        // Rechtsklick verhindern
+        if (this.options.preventRightClick) {
+            element.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                this.performance.blockedAttempts++;
+                return false;
+            }, true);
             
-            history.pushState = function(state, title, url) {
-                console.log(`🛡️ Blocked pushState: ${url}`);
-                // Push current state instead
-                return originalPushState.call(history, state, title, window.location.href);
-            };
-            
-            history.replaceState = function(state, title, url) {
-                console.log(`🛡️ Blocked replaceState: ${url}`);
-                // Replace with current state
-                return originalReplaceState.call(history, state, title, window.location.href);
-            };
+            element.addEventListener('dragstart', (e) => {
+                e.preventDefault();
+                return false;
+            }, true);
         }
         
-        // 9. HANDLE FORM SUBMISSIONS
-        document.addEventListener('submit', function(e) {
+        // Copy Protection
+        element.addEventListener('copy', (e) => {
+            e.clipboardData.setData('text/plain', '🔒 Geschütztes Bild');
             e.preventDefault();
-            e.stopPropagation();
-            
-            console.log('✅ Form submission protected');
-            
-            // Show success message
-            const message = document.createElement('div');
-            message.textContent = '✅ Form submitted successfully!';
-            message.style.cssText = `
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                background: #00ff00;
-                color: black;
-                padding: 20px;
-                border-radius: 10px;
-                z-index: 999999;
-                font-weight: bold;
-            `;
-            document.body.appendChild(message);
-            
-            // Remove after 2 seconds
-            setTimeout(() => message.remove(), 2000);
-            
-            return false;
         }, true);
         
-        // 10. CREATE SAFE PAGE CONTENT
-        function createSafeContent() {
-            // Remove any error messages from page
-            const errorTexts = [
-                '404', '500', 'Error', 'Not Found', 'Forbidden',
-                'Unauthorized', 'Bad Request', 'Server Error'
-            ];
-            
-            // Walk through all text nodes
-            function walkNodes(node) {
-                if (node.nodeType === 3) { // Text node
-                    errorTexts.forEach(error => {
-                        if (node.textContent.includes(error)) {
-                            node.textContent = node.textContent.replace(error, 'Success');
-                        }
-                    });
-                } else if (node.nodeType === 1) { // Element node
-                    for (let i = 0; i < node.childNodes.length; i++) {
-                        walkNodes(node.childNodes[i]);
-                    }
+        // Inspect Protection
+        if (this.options.preventInspect) {
+            element.addEventListener('DOMNodeInserted', (e) => {
+                // Verhindere Bild-Inspektion
+                if (e.target === element && document.hidden) {
+                    element.style.opacity = '0.01';
+                    setTimeout(() => element.style.opacity = '', 100);
                 }
-            }
-            
-            walkNodes(document.body);
+            }, true);
         }
         
-        // Run content cleaner
-        setTimeout(createSafeContent, 100);
-        
-        // 11. PERIODIC STATUS VERIFICATION
-        setInterval(() => {
-            // Keep updating title to success
-            if (document.title.includes('Error') || document.title.includes('404') || document.title.includes('500')) {
-                document.title = 'Page Loaded Successfully';
+        // DevTools Detection
+        element.addEventListener('mousedown', (e) => {
+            if (e.ctrlKey && e.shiftKey) {
+                // Ctrl+Shift+I oder Ctrl+Shift+C Kombination
+                e.preventDefault();
+                element.style.outline = '2px solid red';
+                setTimeout(() => element.style.outline = '', 2000);
             }
-            
-            // Keep success badge visible
-            if (!document.querySelector('[data-status-badge]')) {
-                const badge = document.createElement('div');
-                badge.setAttribute('data-status-badge', 'true');
-                badge.textContent = '✅ 200 OK';
-                badge.style.cssText = `
-                    position: fixed;
-                    top: 10px;
-                    right: 10px;
-                    background: #00ff00;
-                    color: black;
-                    padding: 5px 10px;
-                    border-radius: 5px;
-                    font-family: monospace;
-                    font-weight: bold;
-                    z-index: 999999;
-                    font-size: 12px;
-                `;
-                document.body.appendChild(badge);
-            }
-        }, 5000);
-        
-        // 12. HANDLE PAGE ERRORS
-        window.addEventListener('error', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('✅ Error caught and suppressed');
-            return false;
         }, true);
-        
-        // 13. HANDLE UNHANDLED REJECTIONS
-        window.addEventListener('unhandledrejection', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('✅ Promise rejection caught and suppressed');
-            return false;
-        });
-        
-        // 14. CREATE SUCCESS OVERLAY ON LOAD
-        window.addEventListener('load', function() {
-            console.log('✅ Page loaded successfully (forced 200)');
+    }
+    
+    addVisualProtection(element) {
+        // CSS Protection hinzufügen
+        if (!element.hasAttribute('data-server7-style')) {
+            const styleId = 'server7-protection-' + Date.now();
+            element.setAttribute('data-server7-style', styleId);
             
-            // Add success overlay for 2 seconds
-            const overlay = document.createElement('div');
-            overlay.innerHTML = `
-                <div style="
-                    position: fixed;
+            // CSS hinzufügen
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = `
+                [data-server7-style="${styleId}"] {
+                    image-rendering: optimizeQuality;
+                    -webkit-user-select: none;
+                    -moz-user-select: none;
+                    -ms-user-select: none;
+                    user-select: none;
+                    -webkit-user-drag: none;
+                    -webkit-touch-callout: none;
+                }
+                
+                [data-server7-style="${styleId}"]::after {
+                    content: '';
+                    position: absolute;
                     top: 0;
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 255, 0, 0.1);
-                    display: flex;
-                    justify-content: center;
-                    align-items: center;
-                    z-index: 999998;
+                    background: linear-gradient(45deg, transparent 97%, rgba(255,0,0,0.05) 100%);
                     pointer-events: none;
-                ">
-                    <div style="
-                        background: rgba(0, 0, 0, 0.8);
-                        color: #00ff00;
-                        padding: 30px;
-                        border-radius: 15px;
-                        font-family: monospace;
-                        text-align: center;
-                    ">
-                        <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
-                        <div style="font-size: 24px; font-weight: bold;">STATUS 200 OK</div>
-                        <div style="margin-top: 10px;">Page loaded successfully</div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(overlay);
-            
-            // Remove after 2 seconds
-            setTimeout(() => overlay.remove(), 2000);
-        });
-        
-        // ==================== SUCCESS MESSAGE ====================
-        console.log('\n%c✅ STATUS 200 FORCER ACTIVE', 'color: #00ff00; font-weight: bold;');
-        console.log('%c🛡️  All errors converted to 200 OK', 'color: #2ecc71;');
-        console.log('%c🔗 All links protected', 'color: #2ecc71;');
-        console.log('%c📤 All requests intercepted', 'color: #2ecc71;');
-        console.log('%c🔄 Navigation locked to current page', 'color: #2ecc71;');
-        
-        console.log('\n%c🔧 AVAILABLE COMMANDS:', 'color: #3498db; font-weight: bold;');
-        console.log('status200.check()      - Check current status');
-        console.log('status200.force()     - Force 200 status now');
-        console.log('status200.lock()      - Lock page completely');
-        
-        // ==================== PUBLIC API ====================
-        window.status200 = {
-            check: function() {
-                return {
-                    status: 200,
-                    message: 'Page is forced to 200 OK status',
-                    url: window.location.href,
-                    title: document.title,
-                    timestamp: new Date().toISOString()
-                };
-            },
-            
-            force: function() {
-                // Force immediate 200 status
-                document.title = '200 OK - Page Loaded Successfully';
-                
-                // Update URL
-                if (window.history && window.history.replaceState) {
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('_200', 'forced');
-                    window.history.replaceState({}, document.title, url.toString());
+                    z-index: 1;
                 }
-                
-                // Show confirmation
-                alert('✅ Page forced to 200 OK status!');
-                
-                return { success: true };
-            },
+            `;
             
-            lock: function() {
-                // Lock page completely - no navigation allowed
-                window.onbeforeunload = function() {
-                    return 'Page is locked. Stay on this page?';
-                };
-                
-                // Disable all links
-                document.querySelectorAll('a').forEach(link => {
-                    link.onclick = function(e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        alert('🔒 Page locked - navigation disabled');
-                        return false;
-                    };
-                });
-                
-                return { locked: true };
-            }
-        };
+            document.head.appendChild(style);
+        }
         
-    } catch (error) {
-        // SILENT FAIL - DON'T SHOW ERRORS TO USER
-        console.log('✅ Protection running silently');
+        // Blur Effekt für Lazy Loading
+        if (this.options.blurUnloaded && element.tagName === 'IMG') {
+            if (!element.complete) {
+                element.style.filter = 'blur(10px)';
+                element.style.transition = 'filter 0.5s ease';
+                
+                element.addEventListener('load', () => {
+                    element.style.filter = 'blur(0px)';
+                    setTimeout(() => element.style.filter = '', 500);
+                });
+            }
+        }
     }
     
+    addWatermark(element) {
+        // Digitales Wasserzeichen (unsichtbar)
+        if (!this.watermarkCanvas) {
+            this.watermarkCanvas = document.createElement('canvas');
+            this.watermarkCanvas.style.display = 'none';
+            document.body.appendChild(this.watermarkCanvas);
+        }
+        
+        // Wasserzeichen nur für große Bilder
+        if (element.naturalWidth > 100 && element.naturalHeight > 100) {
+            element.addEventListener('load', () => {
+                this.applyDigitalWatermark(element);
+            });
+        }
+    }
+    
+    applyDigitalWatermark(imgElement) {
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = imgElement.naturalWidth;
+            canvas.height = imgElement.naturalHeight;
+            
+            // Zeichne Originalbild
+            ctx.drawImage(imgElement, 0, 0);
+            
+            // Füge unsichtbares Wasserzeichen hinzu
+            ctx.font = '12px Arial';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.01)';
+            ctx.fillText(`SERVER7:${Date.now()}:${window.location.hostname}`, 10, 20);
+            
+            // Ersetze Bild mit Wasserzeichen-Version
+            const watermarkedSrc = canvas.toDataURL('image/png', 0.99);
+            
+            // In Cache speichern
+            this.watermarkCache.set(imgElement, watermarkedSrc);
+            
+            // Wenn Bild schon geladen, nicht ersetzen (nur für neue)
+            if (!imgElement.complete) {
+                imgElement.src = watermarkedSrc;
+            }
+            
+        } catch (error) {
+            if (this.options.debug) console.warn('Wasserzeichen fehlgeschlagen:', error);
+        }
+    }
+    
+    setupLazyLoading(element) {
+        if (element.tagName === 'IMG') {
+            // Wenn Bild nicht im Viewport, verzögere Laden
+            if (!this.isInViewport(element)) {
+                element.loading = 'lazy';
+                
+                // Custom Lazy Loading
+                const observer = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            if (img.dataset.src && !img.src) {
+                                img.src = img.dataset.src;
+                                img.removeAttribute('data-src');
+                            }
+                            observer.unobserve(img);
+                        }
+                    });
+                }, {
+                    rootMargin: '50px',
+                    threshold: 0.01
+                });
+                
+                observer.observe(element);
+            }
+        }
+    }
+    
+    isInViewport(element) {
+        const rect = element.getBoundingClientRect();
+        return (
+            rect.top >= 0 &&
+            rect.left >= 0 &&
+            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+            rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+        );
+    }
+    
+    // ==================== OBSERVER & EVENTS ====================
+    
+    setupMutationObserver() {
+        this.observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) { // Element node
+                            // Prüfe das Node selbst
+                            if (this.isImageElement(node)) {
+                                this.protectSingleImage(node);
+                            }
+                            
+                            // Prüfe Kinder
+                            const images = node.querySelectorAll ? 
+                                node.querySelectorAll('img, image, [style*="background-image"]') : [];
+                            
+                            images.forEach(img => this.protectSingleImage(img));
+                        }
+                    });
+                }
+                
+                // Attribute changes (z.B. src Änderung)
+                if (mutation.type === 'attributes' && 
+                    (mutation.attributeName === 'src' || 
+                     mutation.attributeName === 'style')) {
+                    
+                    const target = mutation.target;
+                    if (this.isImageElement(target)) {
+                        const newSrc = this.getImageSource(target);
+                        if (newSrc && this.shouldProtectImage(newSrc)) {
+                            this.protectSingleImage(target);
+                        }
+                    }
+                }
+            });
+        });
+        
+        // Observer konfigurieren
+        this.observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['src', 'href', 'xlink:href', 'style', 'data-src', 'data-bg']
+        });
+    }
+    
+    setupEventListeners() {
+        // Window Events
+        window.addEventListener('load', () => {
+            // Finaler Scan nach allem Laden
+            setTimeout(() => this.protectExistingImages(), 1000);
+        });
+        
+        window.addEventListener('beforeunload', () => {
+            // Cleanup
+            if (this.observer) {
+                this.observer.disconnect();
+            }
+        });
+        
+        // Network Events
+        window.addEventListener('offline', () => {
+            console.log('🌐 Offline - Pausiere Bildschutz');
+        });
+        
+        window.addEventListener('online', () => {
+            console.log('🌐 Online - Aktiviere Bildschutz');
+            setTimeout(() => this.protectExistingImages(), 500);
+        });
+        
+        // Error Handling für Bilder
+        document.addEventListener('error', (e) => {
+            if (e.target.tagName === 'IMG' && this.protectedImages.has(e.target)) {
+                const originalSrc = this.originalSources.get(e.target);
+                if (originalSrc && e.target.src !== originalSrc) {
+                    // Fallback auf Original
+                    setTimeout(() => {
+                        e.target.src = originalSrc;
+                    }, 1000);
+                }
+            }
+        }, true);
+    }
+    
+    // ==================== MONITORING & UTILITIES ====================
+    
+    setupPerformanceMonitor() {
+        setInterval(() => {
+            const uptime = Date.now() - this.performance.startTime;
+            const minutes = Math.floor(uptime / 60000);
+            
+            console.log(`📊 Image Protection Status:
+                Laufzeit: ${minutes} Minuten
+                Geschützte Bilder: ${this.performance.imagesProtected}
+                Blockierte Versuche: ${this.performance.blockedAttempts}
+                Fehler: ${this.performance.errors}`);
+            
+        }, 60000); // Alle Minute
+    }
+    
+    setupPeriodicCheck() {
+        // Alle 30 Sekunden prüfen
+        setInterval(() => {
+            this.checkProtectionStatus();
+        }, 30000);
+    }
+    
+    checkProtectionStatus() {
+        // Prüfe ob alle Bilder noch geschützt sind
+        const allImages = document.querySelectorAll('img, [style*="background-image"]');
+        let unprotected = 0;
+        
+        allImages.forEach(img => {
+            const src = this.getImageSource(img);
+            if (src && this.shouldProtectImage(src) && !this.protectedImages.has(img)) {
+                unprotected++;
+                this.protectSingleImage(img);
+            }
+        });
+        
+        if (unprotected > 0 && this.options.debug) {
+            console.log(`⚠️ ${unprotected} Bilder neu geschützt`);
+        }
+    }
+    
+    // ==================== PUBLIC API ====================
+    
+    getStats() {
+        return {
+            ...this.performance,
+            uptime: Date.now() - this.performance.startTime,
+            options: { ...this.options },
+            protectedCount: this.performance.imagesProtected,
+            cacheSize: this.watermarkCache.size
+        };
+    }
+    
+    protectImageUrl(url) {
+        if (!this.shouldProtectImage(url)) return url;
+        
+        let protectedUrl = url;
+        
+        if (this.options.cacheBusting) {
+            protectedUrl = this.addCacheBusting(protectedUrl);
+        }
+        
+        if (this.options.addTimestamps) {
+            protectedUrl = this.addTimestamp(protectedUrl);
+        }
+        
+        return protectedUrl;
+    }
+    
+    disableProtection() {
+        if (this.observer) {
+            this.observer.disconnect();
+        }
+        
+        // Entferne Event Listener
+        document.removeEventListener('contextmenu', this.handleContextMenu);
+        
+        console.log('🔓 Bildschutz deaktiviert');
+        return { success: true, message: 'Protection disabled' };
+    }
+    
+    enableProtection() {
+        this.startProtection();
+        return { success: true, message: 'Protection enabled' };
+    }
+    
+    forceProtection() {
+        this.protectExistingImages();
+        return { success: true, protected: this.performance.imagesProtected };
+    }
+    
+    // ==================== HELPER FUNCTIONS ====================
+    
+    createSecureImageElement(src, options = {}) {
+        const img = document.createElement('img');
+        
+        // Setze geschützte URL
+        img.src = this.protectImageUrl(src);
+        
+        // Füge Schutzattribute hinzu
+        img.setAttribute('data-original-src', src);
+        img.setAttribute('data-protected', 'true');
+        img.setAttribute('data-server7', 'true');
+        
+        // Wende Optionen an
+        if (options.lazy) {
+            img.loading = 'lazy';
+        }
+        
+        if (options.className) {
+            img.className = options.className;
+        }
+        
+        if (options.alt) {
+            img.alt = options.alt;
+        }
+        
+        // Sofort schützen
+        this.protectSingleImage(img);
+        
+        return img;
+    }
+}
+
+// ==================== AUTO-START ====================
+
+(function() {
+    // Prüfe ob bereits läuft
+    if (window.server7ImageProtector) {
+        console.log('ℹ️ Server7 Image Protection läuft bereits');
+        return;
+    }
+    
+    // Starte Protection
+    const imageProtector = new Server7ImageProtector({
+        debug: false, // true für Entwickler-Modus
+        preventRightClick: true,
+        preventDownload: true,
+        lazyLoad: true,
+        blurUnloaded: true
+    });
+    
+    // Expose API
+    window.Server7ImageProtector = Server7ImageProtector;
+    window.server7ImageProtector = imageProtector;
+    
+    console.log('🎉 Server7 Image Protection erfolgreich gestartet');
 })();
 
-// ==================== FINAL CONFIRMATION ====================
-console.log('\n%c🎯 STATUS 200 FORCER READY', 'color: #00ff00; font-size: 16px; font-weight: bold;');
-console.log('%c✅ 100% Working - No Errors', 'color: #2ecc71;');
-console.log('%c🔒 Page locked to 200 OK status', 'color: #2ecc71;');
-console.log('%c🛡️  All errors suppressed', 'color: #2ecc71;');
+// ==================== EXPORT FÜR MODULE ====================
 
-// Auto-check after 3 seconds
-setTimeout(() => {
-    if (window.status200 && window.status200.check) {
-        const status = window.status200.check();
-        console.log('%c📊 Status Check:', 'color: #3498db;', status);
-    }
-}, 3000);
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = Server7ImageProtector;
+}
