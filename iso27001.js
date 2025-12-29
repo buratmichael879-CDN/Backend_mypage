@@ -1,7 +1,7 @@
 /**
- * 🔓 NIS2/ISO27001 SECURITY SYSTEM MIT BEACON-FREIGABE
- * Vollständige Freigabe für Beacon API zu http://127.0.0.1:3000
- * Fetch bleibt weiterhin komplett befreit
+ * 🔓 NIS2/ISO27001 SECURITY SYSTEM MIT AI LEAK DETECTION
+ * Erweiterte Erkennung für DeepSeek, ChatGPT und andere AI-Tools
+ * Beacon zu localhost:3000 erlaubt, Fetch komplett befreit
  */
 
 (function() {
@@ -9,947 +9,1055 @@
     
     console.clear();
     
-    // ==================== ERWEITERTE KONFIGURATION MIT BEACON-FREIGABE ====================
-    const SECURITY_CONFIG = {
-        // BEACON API KONTROLLE
-        BEACON_CONTROL: {
-            MODE: 'ALLOWED_WITH_LOGGING',
-            ALLOWED_ENDPOINTS: [
-                'http://127.0.0.1:3000',
-                'http://localhost:3000',
-                'ws://127.0.0.1:3000',
-                'ws://localhost:3000'
-            ],
-            BLOCK_ALL_OTHER_BEACONS: false, // Beacons zu anderen Domains erlauben
-            LOGGING: true,
-            WARNINGS: true
+    // ==================== ERWEITERTE AI LEAK DETECTION ====================
+    const AI_SECURITY_CONFIG = {
+        // AI PLATTFORMEN DETECTION
+        AI_PLATFORMS: {
+            DEEPSEEK: {
+                NAME: 'DeepSeek',
+                DOMAINS: [
+                    'deepseek.com',
+                    'api.deepseek.com',
+                    'chat.deepseek.com',
+                    'platform.deepseek.ai'
+                ],
+                API_PATTERNS: [
+                    /deepseek.*api/i,
+                    /api.*deepseek/i,
+                    /deepseek.*chat/i,
+                    /deepseek.*v1/i
+                ],
+                USER_AGENTS: [
+                    'deepseek',
+                    'deepseek-ai',
+                    'deepseek-chat'
+                ],
+                COOKIE_PATTERNS: [
+                    /deepseek_session/i,
+                    /deepseek_token/i,
+                    /_ds_/i
+                ],
+                LOCAL_STORAGE_KEYS: [
+                    'deepseek_',
+                    'ds_',
+                    'deepseek_chat_'
+                ]
+            },
+            
+            CHATGPT: {
+                NAME: 'ChatGPT/OpenAI',
+                DOMAINS: [
+                    'openai.com',
+                    'chat.openai.com',
+                    'api.openai.com',
+                    'platform.openai.com',
+                    'chatgpt.com'
+                ],
+                API_PATTERNS: [
+                    /openai.*api/i,
+                    /api.*openai/i,
+                    /chatgpt.*api/i,
+                    /gpt.*api/i,
+                    /v1.*chat\/completions/i
+                ],
+                USER_AGENTS: [
+                    'chatgpt',
+                    'openai',
+                    'gpt-',
+                    'chatgpt-web'
+                ],
+                COOKIE_PATTERNS: [
+                    /_openai_session/i,
+                    /_chatgpt_/i,
+                    /__Secure-next-auth/i
+                ],
+                LOCAL_STORAGE_KEYS: [
+                    'openai_',
+                    'chatgpt_',
+                    'nextauth_',
+                    'oai_'
+                ]
+            },
+            
+            CLAUDE: {
+                NAME: 'Claude/Anthropic',
+                DOMAINS: [
+                    'anthropic.com',
+                    'claude.ai',
+                    'console.anthropic.com'
+                ],
+                API_PATTERNS: [
+                    /anthropic.*api/i,
+                    /api.*anthropic/i,
+                    /claude.*api/i,
+                    /v1.*messages/i
+                ],
+                USER_AGENTS: [
+                    'claude',
+                    'anthropic',
+                    'claude-web'
+                ]
+            },
+            
+            GEMINI: {
+                NAME: 'Gemini/Google',
+                DOMAINS: [
+                    'gemini.google.com',
+                    'ai.google.dev',
+                    'generativelanguage.googleapis.com'
+                ],
+                API_PATTERNS: [
+                    /gemini.*api/i,
+                    /generativelanguage.*api/i
+                ]
+            },
+            
+            GENERAL_AI: {
+                NAME: 'Allgemeine AI-Tools',
+                DETECTION_PATTERNS: [
+                    // API Key Patterns
+                    /sk-[a-zA-Z0-9]{48}/i, // OpenAI Key
+                    /sk-[a-zA-Z0-9_-]{20,}/i, // Allgemeine Secret Keys
+                    /[a-zA-Z0-9]{32,}/i, // Allgemeine lange Tokens
+                    
+                    // Prompt Leakage
+                    /system.*prompt/i,
+                    /user.*prompt/i,
+                    /assistant.*prompt/i,
+                    
+                    // AI Conversation Patterns
+                    /role.*:\s*(system|user|assistant)/i,
+                    /content.*:\s*".*"/i,
+                    /messages.*\[.*\]/i,
+                    
+                    // Model Names
+                    /model.*:\s*(gpt|claude|gemini|llama|mistral)/i,
+                    /(gpt-4|gpt-3\.5|claude-3|claude-2|gemini-pro)/i,
+                    
+                    // AI Service Patterns
+                    /temperature.*:\s*\d+\.?\d*/i,
+                    /max_tokens.*:\s*\d+/i,
+                    /top_p.*:\s*\d+\.?\d*/i
+                ]
+            }
         },
         
-        // FETCH KONTROLLE (weiterhin befreit)
-        FETCH_CONTROL: {
-            MODE: 'UNRESTRICTED',
-            LOGGING: true,
-            WARNINGS: true,
-            ALLOW_ALL: true
+        // LEAK DETECTION LEVELS
+        DETECTION_LEVELS: {
+            LOW: {
+                name: 'Niedrig',
+                scanFrequency: 30000, // 30 Sekunden
+                alertThreshold: 3,
+                actions: ['LOG', 'WARN']
+            },
+            MEDIUM: {
+                name: 'Mittel',
+                scanFrequency: 15000, // 15 Sekunden
+                alertThreshold: 2,
+                actions: ['LOG', 'WARN', 'BLOCK_SENSITIVE']
+            },
+            HIGH: {
+                name: 'Hoch',
+                scanFrequency: 5000, // 5 Sekunden
+                alertThreshold: 1,
+                actions: ['LOG', 'WARN', 'BLOCK_ALL', 'REDACT']
+            }
         },
         
-        // SICHERHEITSSCHICHTEN
-        SECURITY_LAYERS: {
-            NIS2_COMPLIANCE: true,
-            ISO27001_COMPLIANCE: true,
-            GERMANY_ACCESS: true,
-            REAL_TIME_MONITORING: true,
-            THREAT_DETECTION: true
-        }
+        // CURRENT CONFIG
+        CURRENT_LEVEL: 'HIGH',
+        REAL_TIME_SCANNING: true,
+        DATA_REDACTION: true,
+        AUTO_BLOCKING: true
     };
     
-    // ==================== BEACON-FREIGABE-SYSTEM ====================
-    class BeaconLiberationSystem {
+    // ==================== AI LEAK DETECTION SYSTEM ====================
+    class AILeakDetectionSystem {
         constructor() {
-            this.beaconStats = {
-                totalAttempts: 0,
-                allowedBeacons: 0,
-                blockedBeacons: 0,
-                lastBeacon: null,
-                localBeacons: 0,
-                externalBeacons: 0
-            };
-            
-            this.beaconLog = [];
+            this.detectedLeaks = [];
+            this.aiActivities = [];
             this.securityAlerts = [];
+            this.scanHistory = [];
+            this.protectedData = new Set();
             
-            this.liberateBeaconAPI();
-            console.log('%c📡 BEACON-API FREIGEGEBEN FÜR LOCALHOST:3000', 'color: #00FF00; font-weight: bold;');
+            this.initializeAIDetection();
+            console.log('%c🤖 AI LEAK DETECTION INITIALISIERT (DeepSeek + ChatGPT)', 
+                        'color: #FF6B6B; font-weight: bold;');
         }
         
-        liberateBeaconAPI() {
-            if (!navigator.sendBeacon) {
-                console.warn('⚠️ Beacon API nicht verfügbar');
-                return;
-            }
+        initializeAIDetection() {
+            // 1. Initial Scan
+            this.performInitialScan();
             
-            const originalSendBeacon = navigator.sendBeacon;
-            const self = this;
+            // 2. Real-time Monitoring
+            this.setupRealTimeMonitoring();
             
-            navigator.sendBeacon = function(url, data) {
-                self.beaconStats.totalAttempts++;
-                self.beaconStats.lastBeacon = new Date().toISOString();
-                
-                // URL analysieren
-                let parsedUrl;
-                try {
-                    parsedUrl = new URL(url);
-                } catch (e) {
-                    // Bei ungültiger URL standardmäßig erlauben
-                    if (SECURITY_CONFIG.BEACON_CONTROL.LOGGING) {
-                        console.warn(`⚠️ Beacon mit ungültiger URL: ${url}`);
-                    }
-                    return originalSendBeacon.call(this, url, data);
-                }
-                
-                const hostname = parsedUrl.hostname;
-                const isLocal = hostname === '127.0.0.1' || hostname === 'localhost';
-                
-                // Log-Eintrag erstellen
-                const logEntry = {
-                    timestamp: new Date().toISOString(),
-                    url: url,
-                    hostname: hostname,
-                    isLocal: isLocal,
-                    dataType: typeof data,
-                    dataSize: data ? data.toString().length : 0
-                };
-                
-                // Prüfen ob Beacon erlaubt ist
-                const isAllowed = self.isBeaconAllowed(url);
-                
-                if (isAllowed) {
-                    self.beaconStats.allowedBeacons++;
-                    if (isLocal) {
-                        self.beaconStats.localBeacons++;
-                        logEntry.status = 'ALLOWED_LOCAL';
-                        
-                        if (SECURITY_CONFIG.BEACON_CONTROL.LOGGING) {
-                            console.log(`📡 BEACON ERLAUBT (Local): ${url}`);
-                        }
-                    } else {
-                        self.beaconStats.externalBeacons++;
-                        logEntry.status = 'ALLOWED_EXTERNAL';
-                        
-                        if (SECURITY_CONFIG.BEACON_CONTROL.LOGGING) {
-                            console.log(`📡 BEACON ERLAUBT (External): ${url}`);
-                        }
-                    }
-                } else {
-                    self.beaconStats.blockedBeacons++;
-                    logEntry.status = 'BLOCKED';
-                    
-                    if (SECURITY_CONFIG.BEACON_CONTROL.WARNINGS) {
-                        console.warn(`🚫 BEACON BLOCKIERT: ${url}`);
-                        
-                        self.securityAlerts.push({
-                            timestamp: new Date().toISOString(),
-                            type: 'BEACON_BLOCKED',
-                            url: url,
-                            reason: 'Nicht in Whitelist',
-                            severity: 'MEDIUM'
-                        });
-                    }
-                    
-                    return false; // Beacon blockieren
-                }
-                
-                self.beaconLog.push(logEntry);
-                
-                // Beacon Daten analysieren (nur Monitoring)
-                self.monitorBeaconData(url, data);
-                
-                // Original Beacon ausführen
-                return originalSendBeacon.call(this, url, data);
+            // 3. Network Interception
+            this.setupNetworkInterception();
+            
+            // 4. Clipboard Protection
+            this.setupClipboardProtection();
+            
+            // 5. Form Protection
+            this.setupFormProtection();
+            
+            // 6. Storage Monitoring
+            this.setupStorageMonitoring();
+        }
+        
+        performInitialScan() {
+            console.group('%c🔍 INITIAL AI LEAK SCAN:', 'color: #3498db;');
+            
+            const scanResults = {
+                deepseekFound: this.scanForDeepSeek(),
+                chatgptFound: this.scanForChatGPT(),
+                aiPatternsFound: this.scanForAIPatterns(),
+                sensitiveDataFound: this.scanForSensitiveData(),
+                cookies: this.scanCookies(),
+                localStorage: this.scanLocalStorage(),
+                sessionStorage: this.scanSessionStorage()
             };
             
-            console.log('✅ Beacon API wurde freigegeben');
-        }
-        
-        isBeaconAllowed(url) {
-            // Standardmäßig erlauben wenn BLOCK_ALL_OTHER_BEACONS = false
-            if (!SECURITY_CONFIG.BEACON_CONTROL.BLOCK_ALL_OTHER_BEACONS) {
-                return true;
+            console.log('📊 Scan Results:', scanResults);
+            
+            if (scanResults.deepseekFound || scanResults.chatgptFound) {
+                console.warn('⚠️ AI Plattformen erkannt!');
+                this.createAlert('AI_PLATFORM_DETECTED', {
+                    platforms: [
+                        scanResults.deepseekFound ? 'DeepSeek' : null,
+                        scanResults.chatgptFound ? 'ChatGPT' : null
+                    ].filter(Boolean),
+                    severity: 'HIGH'
+                });
             }
             
-            // Spezielle Whitelist-Prüfung
-            for (const allowedEndpoint of SECURITY_CONFIG.BEACON_CONTROL.ALLOWED_ENDPOINTS) {
-                if (url.startsWith(allowedEndpoint)) {
-                    return true;
-                }
+            if (scanResults.aiPatternsFound.length > 0) {
+                console.warn(`⚠️ ${scanResults.aiPatternsFound.length} AI Patterns erkannt`);
+                this.createAlert('AI_PATTERNS_DETECTED', {
+                    count: scanResults.aiPatternsFound.length,
+                    patterns: scanResults.aiPatternsFound.slice(0, 3),
+                    severity: 'MEDIUM'
+                });
             }
             
-            return false;
-        }
-        
-        monitorBeaconData(url, data) {
-            // Nur Monitoring, keine Blockierung
-            if (!data || typeof data !== 'string') return;
-            
-            const sensitivePatterns = [
-                /password=([^&]+)/i,
-                /token=([^&]+)/i,
-                /key=([^&]+)/i,
-                /secret=([^&]+)/i
-            ];
-            
-            const dataStr = data.toString();
-            
-            for (const pattern of sensitivePatterns) {
-                if (pattern.test(dataStr)) {
-                    console.warn(`⚠️ BEACON MONITOR: Sensitive Daten in Beacon an ${url}`);
-                    
-                    this.securityAlerts.push({
-                        timestamp: new Date().toISOString(),
-                        type: 'SENSITIVE_BEACON_DATA',
-                        url: url,
-                        pattern: pattern.toString(),
-                        severity: 'HIGH',
-                        action: 'WARNING_ONLY'
-                    });
-                    break;
-                }
-            }
-        }
-        
-        getBeaconStats() {
-            return {
-                ...this.beaconStats,
-                logCount: this.beaconLog.length,
-                alertCount: this.securityAlerts.length,
-                config: SECURITY_CONFIG.BEACON_CONTROL
-            };
-        }
-        
-        getRecentBeacons(limit = 10) {
-            return this.beaconLog.slice(-limit);
-        }
-        
-        getSecurityAlerts(limit = 5) {
-            return this.securityAlerts.slice(-limit);
-        }
-        
-        // Beacon Whitelist-Management
-        addBeaconEndpoint(url) {
-            if (!SECURITY_CONFIG.BEACON_CONTROL.ALLOWED_ENDPOINTS.includes(url)) {
-                SECURITY_CONFIG.BEACON_CONTROL.ALLOWED_ENDPOINTS.push(url);
-                console.log(`✅ Beacon Endpoint hinzugefügt: ${url}`);
-                return true;
-            }
-            return false;
-        }
-        
-        removeBeaconEndpoint(url) {
-            const index = SECURITY_CONFIG.BEACON_CONTROL.ALLOWED_ENDPOINTS.indexOf(url);
-            if (index > -1) {
-                SECURITY_CONFIG.BEACON_CONTROL.ALLOWED_ENDPOINTS.splice(index, 1);
-                console.log(`❌ Beacon Endpoint entfernt: ${url}`);
-                return true;
-            }
-            return false;
-        }
-        
-        toggleBeaconBlocking(blockAll) {
-            SECURITY_CONFIG.BEACON_CONTROL.BLOCK_ALL_OTHER_BEACONS = blockAll;
-            console.log(`🔧 Beacon Blocking: ${blockAll ? 'AKTIVIERT' : 'DEAKTIVIERT'}`);
-        }
-    }
-    
-    // ==================== FETCH-BEFREIUNGS-SYSTEM (bleibt unverändert) ====================
-    class FetchLiberationSystem {
-        constructor() {
-            this.fetchStats = {
-                totalCalls: 0,
-                allowedCalls: 0,
-                blockedCalls: 0,
-                monitoredCalls: 0,
-                lastCall: null
-            };
-            
-            this.fetchLog = [];
-            this.securityLog = [];
-            
-            this.liberateFetchAPI();
-            console.log('%c🔓 FETCH-API VOLLSTÄNDIG BEFREIT', 'color: #00FF00; font-weight: bold;');
-        }
-        
-        liberateFetchAPI() {
-            if (!window.fetch) return;
-            
-            const originalFetch = window.fetch;
-            const self = this;
-            
-            window.fetch = async function(...args) {
-                const [resource, options] = args;
-                const url = resource instanceof Request ? resource.url : resource.toString();
-                const method = options?.method || 'GET';
-                
-                self.fetchStats.totalCalls++;
-                self.fetchStats.lastCall = new Date().toISOString();
-                self.fetchStats.allowedCalls++;
-                
-                const logEntry = {
-                    timestamp: new Date().toISOString(),
-                    url: url,
-                    method: method,
-                    status: 'ALLOWED',
-                    mode: 'UNRESTRICTED'
-                };
-                
-                self.fetchLog.push(logEntry);
-                
-                if (SECURITY_CONFIG.FETCH_CONTROL.LOGGING) {
-                    console.log(`🔓 FETCH ERLAUBT: ${method} ${url.substring(0, 100)}...`);
-                }
-                
-                try {
-                    const response = await originalFetch.apply(this, arguments);
-                    return response;
-                } catch (error) {
-                    self.securityLog.push({
-                        timestamp: new Date().toISOString(),
-                        type: 'FETCH_ERROR',
-                        url: url,
-                        error: error.message,
-                        severity: 'LOW'
-                    });
-                    throw error;
-                }
-            };
-        }
-        
-        getFetchStats() {
-            return {
-                ...this.fetchStats,
-                logCount: this.fetchLog.length,
-                securityLogCount: this.securityLog.length,
-                config: SECURITY_CONFIG.FETCH_CONTROL
-            };
-        }
-    }
-    
-    // ==================== VOLLSTÄNDIGES SICHERHEITSSYSTEM ====================
-    class CompleteSecuritySystemWithBeaconAccess {
-        constructor() {
-            this.beaconSystem = new BeaconLiberationSystem();
-            this.fetchSystem = new FetchLiberationSystem();
-            this.complianceSystem = new ComplianceSystem();
-            this.monitoringSystem = new MonitoringSystem();
-            
-            this.initializeCompleteSystem();
-        }
-        
-        async initializeCompleteSystem() {
-            console.clear();
-            
-            // Banner anzeigen
-            console.log('%c' + 
-                '╔════════════════════════════════════════════════════════════════════════════════════╗\n' +
-                '║                                                                                    ║\n' +
-                '║   📡  NIS2/ISO27001 SECURITY SYSTEM - BEACON + FETCH BEFREIT   📡               ║\n' +
-                '║                                                                                    ║\n' +
-                '╚════════════════════════════════════════════════════════════════════════════════════╝', 
-                'color: #000000; background: #00FF00; font-weight: bold; font-size: 12px;'
-            );
-            
-            console.log('\n%c🚀 SICHERHEITSSYSTEM MIT BEACON & FETCH FREIGABE WIRD GESTARTET...', 
-                        'color: #00FF00; font-weight: bold;');
-            
-            await this.initializeAllSystems();
-            this.displaySecurityDashboard();
-            this.setupDeveloperAPI();
-            this.demonstrateBeaconAndFetch();
-        }
-        
-        async initializeAllSystems() {
-            console.group('%c🔧 SYSTEMINITIALISIERUNG:', 'color: #3498db;');
-            
-            const systems = [
-                { name: '📡 Beacon Liberation System', status: '✅ FREIGEGEBEN' },
-                { name: '🔓 Fetch Liberation System', status: '✅ BEFREIT' },
-                { name: '📋 NIS2 Compliance (95 Module)', status: '✅ AKTIV' },
-                { name: '📋 ISO27001 Controls (8048)', status: '✅ AKTIV' },
-                { name: '🇩🇪 Germany Access Control', status: '✅ AKTIV' },
-                { name: '👁️ Real-time Monitoring', status: '✅ AKTIV' },
-                { name: '🚨 Threat Detection', status: '✅ AKTIV' },
-                { name: '📊 Security Analytics', status: '✅ AKTIV' }
-            ];
-            
-            for (const system of systems) {
-                console.log(`${system.status} ${system.name}`);
-                await this.delay(80);
-            }
+            this.scanHistory.push({
+                timestamp: new Date().toISOString(),
+                type: 'INITIAL_SCAN',
+                results: scanResults
+            });
             
             console.groupEnd();
         }
         
-        displaySecurityDashboard() {
-            console.log('\n%c📊 SICHERHEITS-DASHBOARD (BEACON + FETCH FREI)', 'color: #1abc9c; font-weight: bold; font-size: 16px;');
-            console.log('%c════════════════════════════════════════════════════════════════════════════', 'color: #666;');
+        scanForDeepSeek() {
+            const indicators = [];
             
-            const beaconStats = this.beaconSystem.getBeaconStats();
-            const fetchStats = this.fetchSystem.getFetchStats();
+            // Check User Agent
+            if (navigator.userAgent.toLowerCase().includes('deepseek')) {
+                indicators.push('User Agent contains DeepSeek');
+            }
             
-            console.table({
-                '📡 Beacon System': {
-                    'Status': '✅ FREIGEGEBEN',
-                    'Modus': beaconStats.config.MODE,
-                    'Erlaubte Endpoints': beaconStats.config.ALLOWED_ENDPOINTS.length,
-                    'Total Beacons': beaconStats.totalAttempts,
-                    'Erlaubt': beaconStats.allowedBeacons,
-                    'Blockiert': beaconStats.blockedBeacons,
-                    'Lokale Beacons': beaconStats.localBeacons
-                },
-                '🔓 Fetch System': {
-                    'Status': '✅ VOLL BEFREIT',
-                    'Modus': fetchStats.config.MODE,
-                    'Total Calls': fetchStats.totalCalls,
-                    'Erlaubt': fetchStats.allowedCalls,
-                    'Blockiert': fetchStats.blockedCalls,
-                    'Logging': fetchStats.config.LOGGING ? '✅ AN' : '❌ AUS'
-                },
-                '📋 NIS2 Compliance': {
-                    'Status': '✅ VOLLSTÄNDIG',
-                    'Module': '95/95',
-                    'Level': 'FULL_COMPLIANCE',
-                    'Audit': 'PASSED'
-                },
-                '📋 ISO27001 Compliance': {
-                    'Status': '✅ ZERTIFIZIERT',
-                    'Controls': '8048/8048',
-                    'Standard': 'ISO27001:2022',
-                    'Certification': 'VALID'
+            // Check Cookies
+            const cookies = document.cookie.toLowerCase();
+            if (cookies.includes('deepseek')) {
+                indicators.push('DeepSeek cookies found');
+            }
+            
+            // Check Local Storage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.toLowerCase().includes('deepseek')) {
+                    indicators.push(`LocalStorage key: ${key}`);
+                }
+            }
+            
+            // Check Page Content
+            const pageContent = document.body.innerText.toLowerCase();
+            AI_SECURITY_CONFIG.AI_PLATFORMS.DEEPSEEK.API_PATTERNS.forEach(pattern => {
+                if (pattern.test(pageContent)) {
+                    indicators.push(`DeepSeek API pattern: ${pattern}`);
                 }
             });
             
-            // Erlaubte Beacon Endpoints anzeigen
-            console.log('\n%c✅ ERLAUBTE BEACON ENDPOINTS:', 'color: #2ecc71; font-weight: bold;');
-            beaconStats.config.ALLOWED_ENDPOINTS.forEach(endpoint => {
-                console.log(`  📍 ${endpoint}`);
+            return indicators.length > 0 ? indicators : false;
+        }
+        
+        scanForChatGPT() {
+            const indicators = [];
+            
+            // Check User Agent
+            const userAgent = navigator.userAgent.toLowerCase();
+            AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.USER_AGENTS.forEach(ua => {
+                if (userAgent.includes(ua.toLowerCase())) {
+                    indicators.push(`User Agent contains ${ua}`);
+                }
             });
             
-            // Letzte Beacon-Aktivität
-            console.log('\n%c📡 LETZTE BEACON-AKTIVITÄT:', 'color: #3498db; font-weight: bold;');
-            const recentBeacons = this.beaconSystem.getRecentBeacons(5);
-            if (recentBeacons.length > 0) {
-                recentBeacons.forEach(beacon => {
-                    const icon = beacon.status.includes('ALLOWED') ? '📡' : '🚫';
-                    console.log(`${icon} ${beacon.status} ${beacon.url.substring(0, 80)}...`);
+            // Check Cookies
+            const cookies = document.cookie;
+            AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.COOKIE_PATTERNS.forEach(pattern => {
+                if (pattern.test(cookies)) {
+                    indicators.push(`ChatGPT cookie pattern: ${pattern}`);
+                }
+            });
+            
+            // Check Local Storage
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.LOCAL_STORAGE_KEYS.forEach(lsKey => {
+                    if (key.toLowerCase().includes(lsKey.toLowerCase()) || 
+                        (value && value.toLowerCase().includes(lsKey.toLowerCase()))) {
+                        indicators.push(`LocalStorage: ${key}`);
+                    }
                 });
-            } else {
-                console.log('📭 Noch keine Beacon-Aufrufe');
             }
             
-            // Letzte Fetch-Aktivität
-            console.log('\n%c🔓 LETZTE FETCH-AUFRUFE:', 'color: #f39c12; font-weight: bold;');
-            const recentFetches = this.fetchSystem.fetchLog.slice(-5);
-            if (recentFetches.length > 0) {
-                recentFetches.forEach(fetch => {
-                    console.log(`🔓 ${fetch.method} ${fetch.url.substring(0, 80)}...`);
-                });
-            } else {
-                console.log('📭 Noch keine Fetch-Aufrufe');
+            // Check Page Content for API Keys
+            const pageContent = document.body.innerText;
+            const openAIKeyPattern = /sk-[a-zA-Z0-9]{48}/;
+            if (openAIKeyPattern.test(pageContent)) {
+                indicators.push('OpenAI API Key detected in page content');
             }
-        }
-        
-        demonstrateBeaconAndFetch() {
-            console.log('\n%c🧪 DEMONSTRATION BEACON & FETCH:', 'color: #9b59b6; font-weight: bold;');
-            console.log('%cDie folgenden Aufrufe sind ERLAUBT und werden ausgeführt:', 'color: #666;');
             
-            // Beacon Demos
-            console.log(`
-// === BEACON DEMOS ===
-
-// 1. Beacon zu localhost:3000 (ERLAUBT)
-const beaconData = JSON.stringify({
-    event: 'page_view',
-    timestamp: Date.now(),
-    userAgent: navigator.userAgent
-});
-navigator.sendBeacon('http://127.0.0.1:3000/analytics', beaconData);
-
-// 2. Beacon zu lokalem Endpunkt (ERLAUBT)
-navigator.sendBeacon('http://localhost:3000/api/log', 'user_action=click');
-
-// 3. Beacon mit FormData (ERLAUBT)
-const formData = new FormData();
-formData.append('action', 'submit');
-formData.append('time', Date.now().toString());
-navigator.sendBeacon('http://127.0.0.1:3000/track', formData);
-
-// 4. Beacon zu anderen Domains (ERLAUBT, wenn BLOCK_ALL_OTHER_BEACONS = false)
-navigator.sendBeacon('https://api.example.com/analytics', 'data=test');
-
-// === FETCH DEMOS (weiterhin befreit) ===
-
-// 5. Fetch zu beliebigen URLs (ERLAUBT)
-fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({model: 'gpt-4', messages: []})
-});
-
-// 6. Fetch zu localhost (ERLAUBT)
-fetch('http://127.0.0.1:3000/api/data');
-            `);
-            
-            // Live-Tests starten
-            setTimeout(() => {
-                this.runLiveBeaconTests();
-                this.runLiveFetchTests();
-            }, 2000);
-        }
-        
-        async runLiveBeaconTests() {
-            console.log('\n%c⚡ LIVE BEACON-TESTS:', 'color: #00FF00; font-weight: bold;');
-            
-            const beaconTests = [
-                {
-                    url: 'http://127.0.0.1:3000/analytics',
-                    data: JSON.stringify({ test: 'beacon', timestamp: Date.now() }),
-                    name: 'Localhost Beacon Test'
-                },
-                {
-                    url: 'http://localhost:3000/api/log',
-                    data: 'action=test&time=' + Date.now(),
-                    name: 'Local API Beacon'
+            // Check for ChatGPT specific patterns
+            AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.API_PATTERNS.forEach(pattern => {
+                if (pattern.test(pageContent)) {
+                    indicators.push(`ChatGPT API pattern: ${pattern}`);
                 }
-            ];
+            });
             
-            for (const test of beaconTests) {
-                console.log(`\n🧪 Beacon Test: ${test.name}`);
-                console.log(`   URL: ${test.url}`);
-                
-                try {
-                    const success = navigator.sendBeacon(test.url, test.data);
-                    
-                    if (success) {
-                        console.log(`   ✅ Beacon gesendet: ERFOLGREICH`);
-                        console.log(`   📦 Daten: ${test.data.substring(0, 50)}...`);
-                    } else {
-                        console.log(`   ⚠️ Beacon gesendet: QUEUE FAILED (Browser entscheidet)`);
-                        console.log(`   ℹ️  Beacon wurde akzeptiert, könnte verzögert werden`);
-                    }
-                } catch (error) {
-                    console.log(`   ❌ Beacon Fehler: ${error.message}`);
-                    console.log(`   ℹ️  Dies ist ein JavaScript-Fehler, KEINE Blockierung!`);
-                }
-                
-                await this.delay(1500);
-            }
+            return indicators.length > 0 ? indicators : false;
         }
         
-        async runLiveFetchTests() {
-            console.log('\n%c⚡ LIVE FETCH-TESTS:', 'color: #00FF00; font-weight: bold;');
+        scanForAIPatterns() {
+            const foundPatterns = [];
+            const pageContent = document.body.innerText;
             
-            const fetchTests = [
-                { url: 'https://jsonplaceholder.typicode.com/posts/1', name: 'Public API' },
-                { url: 'http://127.0.0.1:3000/api/test', name: 'Local API' }
-            ];
-            
-            for (const test of fetchTests) {
-                console.log(`\n🧪 Fetch Test: ${test.name}`);
-                console.log(`   URL: ${test.url}`);
-                
-                try {
-                    const startTime = Date.now();
-                    const response = await fetch(test.url);
-                    const endTime = Date.now();
-                    
-                    console.log(`   ✅ Status: ${response.status} ${response.statusText}`);
-                    console.log(`   ⏱️  Dauer: ${endTime - startTime}ms`);
-                    console.log(`   🔓 Fetch: VOLLSTÄNDIG BEFREIT`);
-                    
-                    // Response-Body lesen (falls Text)
-                    if (response.headers.get('content-type')?.includes('application/json')) {
-                        const data = await response.json();
-                        console.log(`   📦 Response: ${JSON.stringify(data).substring(0, 100)}...`);
-                    }
-                } catch (error) {
-                    console.log(`   ❌ Fehler: ${error.message}`);
-                    console.log(`   ℹ️  Netzwerkfehler, KEINE Blockierung!`);
-                }
-                
-                await this.delay(1000);
-            }
-        }
-        
-        setupDeveloperAPI() {
-            window.SecuritySystem = {
-                // Beacon System
-                beacon: {
-                    stats: () => this.beaconSystem.getBeaconStats(),
-                    logs: (limit) => this.beaconSystem.getRecentBeacons(limit),
-                    alerts: () => this.beaconSystem.getSecurityAlerts(),
-                    addEndpoint: (url) => this.beaconSystem.addBeaconEndpoint(url),
-                    removeEndpoint: (url) => this.beaconSystem.removeBeaconEndpoint(url),
-                    toggleBlocking: (blockAll) => this.beaconSystem.toggleBeaconBlocking(blockAll),
-                    
-                    // Beacon Test-Funktionen
-                    test: {
-                        local: async (data) => {
-                            const url = 'http://127.0.0.1:3000/analytics';
-                            console.log(`🧪 Test Beacon zu: ${url}`);
-                            const success = navigator.sendBeacon(url, data || JSON.stringify({
-                                test: true,
-                                timestamp: Date.now(),
-                                userAgent: navigator.userAgent
-                            }));
-                            return { success, url };
-                        },
-                        
-                        custom: async (url, data) => {
-                            console.log(`🧪 Test Beacon zu: ${url}`);
-                            const success = navigator.sendBeacon(url, data);
-                            return { success, url };
-                        }
-                    }
-                },
-                
-                // Fetch System
-                fetch: {
-                    stats: () => this.fetchSystem.getFetchStats(),
-                    logs: (limit) => this.fetchSystem.fetchLog.slice(-limit),
-                    
-                    // Direkter Fetch (immer erlaubt)
-                    safeFetch: async (url, options) => {
-                        console.log(`🔓 SAFE FETCH zu: ${url}`);
-                        return fetch(url, options);
-                    }
-                },
-                
-                // Compliance
-                compliance: {
-                    status: () => this.complianceSystem.getStatus(),
-                    report: () => this.complianceSystem.generateReport()
-                },
-                
-                // Test-Funktionen
-                test: {
-                    beaconAndFetch: async () => {
-                        console.log('🧪 Kombinierter Beacon + Fetch Test');
-                        
-                        // Beacon senden
-                        const beaconResult = navigator.sendBeacon(
-                            'http://127.0.0.1:3000/analytics',
-                            JSON.stringify({ combinedTest: true, time: Date.now() })
-                        );
-                        
-                        // Fetch ausführen
-                        const fetchResult = await fetch('https://jsonplaceholder.typicode.com/posts/1');
-                        
-                        return {
-                            beacon: { success: beaconResult, url: 'http://127.0.0.1:3000/analytics' },
-                            fetch: { success: fetchResult.ok, status: fetchResult.status }
-                        };
-                    },
-                    
-                    allAPIs: async () => {
-                        const results = {};
-                        
-                        // Test Beacon
-                        results.beacon = navigator.sendBeacon(
-                            'http://localhost:3000/test',
-                            'api_test=true'
-                        );
-                        
-                        // Test Fetch
-                        try {
-                            results.fetch = await fetch('https://httpbin.org/get');
-                            results.fetchSuccess = results.fetch.ok;
-                        } catch (error) {
-                            results.fetchError = error.message;
-                        }
-                        
-                        return results;
-                    }
-                },
-                
-                // Hilfe
-                help: () => {
-                    console.log('\n%c🛠️  VERFÜGBARE BEACON/FETCH BEFEHLE:', 'color: #3498db; font-weight: bold;');
-                    console.log('SecuritySystem.beacon.stats()            - Beacon Statistiken');
-                    console.log('SecuritySystem.beacon.test.local()       - Beacon zu localhost testen');
-                    console.log('SecuritySystem.beacon.addEndpoint(url)   - Beacon Endpoint hinzufügen');
-                    console.log('SecuritySystem.fetch.stats()            - Fetch Statistiken');
-                    console.log('SecuritySystem.fetch.safeFetch(url)     - Sicherer Fetch');
-                    console.log('SecuritySystem.test.beaconAndFetch()    - Kombinierten Test');
-                    console.log('SecuritySystem.help()                   - Diese Hilfe');
-                }
-            };
-            
-            console.log('\n%c🛠️  ENTWICKLER-API VERFÜGBAR: SecuritySystem.help()', 
-                        'color: #3498db; font-weight: bold;');
-        }
-        
-        delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-    }
-    
-    // ==================== HILFSKLASSEN ====================
-    class ComplianceSystem {
-        getStatus() {
-            return {
-                nis2: {
-                    total: 95,
-                    implemented: 95,
-                    level: 'FULL_COMPLIANCE',
-                    modules: this.getNIS2Modules()
-                },
-                iso27001: {
-                    total: 8048,
-                    implemented: 8048,
-                    standard: 'ISO27001:2022',
-                    controls: this.getISO27001Controls()
-                }
-            };
-        }
-        
-        getNIS2Modules() {
-            return ['Alle 95 Module aktiv'];
-        }
-        
-        getISO27001Controls() {
-            return ['Alle 8048 Controls aktiv'];
-        }
-        
-        generateReport() {
-            return {
-                timestamp: new Date().toISOString(),
-                system: 'NIS2/ISO27001 Security System with Beacon & Fetch Access',
-                beaconAccess: 'GRANTED_FOR_LOCALHOST_3000',
-                fetchAccess: 'UNRESTRICTED',
-                compliance: {
-                    nis2: 'FULL_COMPLIANCE',
-                    iso27001: 'CERTIFIED',
-                    status: 'PASS',
-                    score: 99.2
-                }
-            };
-        }
-    }
-    
-    class MonitoringSystem {
-        constructor() {
-            this.metrics = {
-                beaconRequests: 0,
-                fetchRequests: 0,
-                securityEvents: 0,
-                systemUptime: Date.now()
-            };
-        }
-        
-        getMetrics() {
-            return {
-                ...this.metrics,
-                uptime: Date.now() - this.metrics.systemUptime,
-                timestamp: new Date().toISOString()
-            };
-        }
-    }
-    
-    // ==================== SYSTEM STARTEN ====================
-    console.log('%c🚀 STARTE SICHERHEITSSYSTEM MIT BEACON & FETCH FREIGABE...', 
-                'color: #00FF00; background: #000; font-weight: bold; padding: 5px;');
-    
-    const securitySystem = new CompleteSecuritySystemWithBeaconAccess();
-    
-    // ==================== SICHERHEITSPROTOKOLL ====================
-    console.log('\n%c📋 SICHERHEITSPROTOKOLL (BEACON + FETCH FREI):', 'color: #00FF00; font-weight: bold;');
-    console.log('1. ✅ Beacon zu http://127.0.0.1:3000 FREIGEGEBEN');
-    console.log('2. ✅ Beacon zu http://localhost:3000 FREIGEGEBEN');
-    console.log('3. ✅ Beacon zu anderen Domains: ERLAUBT (wenn nicht blockiert)');
-    console.log('4. ✅ Fetch-API VOLLSTÄNDIG BEFREIT');
-    console.log('5. ✅ NIS2/ISO27001 Compliance AKTIV');
-    console.log('6. ✅ Real-time Monitoring AKTIV');
-    
-    // ==================== SOFORTIGE BEACON TESTS ====================
-    setTimeout(() => {
-        console.log('\n%c⚡ SOFORTIGE BEACON-TESTS:', 'color: #00FF00; font-weight: bold;');
-        
-        // Test 1: Beacon zu localhost:3000
-        console.log('📡 Test 1: Beacon zu http://127.0.0.1:3000/analytics');
-        const beaconData1 = JSON.stringify({
-            event: 'system_init',
-            timestamp: Date.now(),
-            version: '2.0.0',
-            userAgent: navigator.userAgent.substring(0, 50)
-        });
-        
-        const beacon1Success = navigator.sendBeacon('http://127.0.0.1:3000/analytics', beaconData1);
-        console.log(`   ✅ Beacon gesendet: ${beacon1Success ? 'ERFOLGREICH' : 'QUEUE FAILED'}`);
-        console.log(`   📦 Daten: ${beaconData1.substring(0, 80)}...`);
-        
-        // Test 2: Beacon mit FormData
-        setTimeout(() => {
-            console.log('\n📡 Test 2: Beacon mit FormData zu localhost:3000');
-            const formData = new FormData();
-            formData.append('event', 'page_view');
-            formData.append('url', window.location.href);
-            formData.append('timestamp', Date.now().toString());
-            
-            const beacon2Success = navigator.sendBeacon('http://localhost:3000/track', formData);
-            console.log(`   ✅ Beacon mit FormData: ${beacon2Success ? 'ERFOLGREICH' : 'QUEUE FAILED'}`);
-            console.log(`   📦 Data Type: FormData mit 3 Einträgen`);
-            
-            // Test 3: Fetch parallel testen
-            setTimeout(() => {
-                console.log('\n🔓 Test 3: Parallel Fetch + Beacon');
-                
-                // Beacon senden
-                navigator.sendBeacon('http://127.0.0.1:3000/log', 'combined_test=true');
-                
-                // Fetch ausführen
-                fetch('https://jsonplaceholder.typicode.com/todos/1')
-                    .then(response => {
-                        console.log(`   ✅ Fetch parallel ausgeführt: ${response.status}`);
-                        console.log(`   🔓 Beacon & Fetch sind beide FREI!`);
-                    })
-                    .catch(error => {
-                        console.log(`   ❌ Fetch Fehler: ${error.message}`);
-                        console.log(`   ℹ️  Netzwerkfehler, KEINE Blockierung!`);
+            AI_SECURITY_CONFIG.AI_PLATFORMS.GENERAL_AI.DETECTION_PATTERNS.forEach(pattern => {
+                const matches = pageContent.match(pattern);
+                if (matches) {
+                    foundPatterns.push({
+                        pattern: pattern.toString().substring(0, 50),
+                        matches: matches.length,
+                        sample: matches[0].substring(0, 100)
                     });
-            }, 1000);
-        }, 1000);
-    }, 1500);
-
-})();
-
-// ==================== BEACON BEISPIELE FÜR DIE ANWENDUNG ====================
-console.log('\n%c🎯 BEACON IMPLEMENTIERUNG FÜR DIE ANWENDUNG:', 'color: #9b59b6; font-weight: bold;');
-console.log(`
-// === BEACON FÜR ANALYTICS ===
-
-// 1. Page View Tracking
-function trackPageView() {
-    const data = JSON.stringify({
-        event: 'page_view',
-        url: window.location.href,
-        referrer: document.referrer,
-        timestamp: Date.now(),
-        userId: getUserId() // Deine User-ID Funktion
-    });
-    
-    // Beacon zu localhost:3000 senden
-    navigator.sendBeacon('http://127.0.0.1:3000/api/analytics/pageview', data);
-}
-
-// 2. User Actions Tracking
-function trackUserAction(action, details = {}) {
-    const data = JSON.stringify({
-        event: 'user_action',
-        action: action,
-        details: details,
-        timestamp: Date.now(),
-        userId: getUserId()
-    });
-    
-    navigator.sendBeacon('http://localhost:3000/api/analytics/actions', data);
-}
-
-// 3. Error Logging
-function logError(error, context = {}) {
-    const data = JSON.stringify({
-        event: 'error',
-        message: error.message,
-        stack: error.stack,
-        context: context,
-        url: window.location.href,
-        timestamp: Date.now(),
-        userAgent: navigator.userAgent
-    });
-    
-    navigator.sendBeacon('http://127.0.0.1:3000/api/logs/errors', data);
-}
-
-// 4. Performance Metrics
-function logPerformance(metricName, value) {
-    const data = JSON.stringify({
-        event: 'performance',
-        metric: metricName,
-        value: value,
-        timestamp: Date.now(),
-        url: window.location.href
-    });
-    
-    navigator.sendBeacon('http://localhost:3000/api/analytics/performance', data);
-}
-
-// 5. Form Submission Tracking (vor unload)
-window.addEventListener('beforeunload', function() {
-    const formData = new FormData();
-    formData.append('page', window.location.href);
-    formData.append('timeSpent', calculateTimeSpent());
-    formData.append('exitTime', Date.now());
-    
-    navigator.sendBeacon('http://127.0.0.1:3000/api/analytics/exit', formData);
-});
-
-// === KOMBINIERT MIT FETCH ===
-
-// 6. Beacon für Logging + Fetch für Daten
-async function submitFormWithAnalytics(formData) {
-    // Beacon für schnelles Logging
-    navigator.sendBeacon('http://localhost:3000/api/logs/form_start', 
-        JSON.stringify({ formId: 'contact', time: Date.now() }));
-    
-    // Fetch für eigentliche Verarbeitung
-    try {
-        const response = await fetch('http://127.0.0.1:3000/api/forms/contact', {
-            method: 'POST',
-            body: formData
-        });
+                }
+            });
+            
+            return foundPatterns;
+        }
         
-        // Beacon für Erfolgs-Logging
-        navigator.sendBeacon('http://localhost:3000/api/logs/form_success',
-            JSON.stringify({ formId: 'contact', time: Date.now(), status: response.status }));
+        scanForSensitiveData() {
+            const sensitiveData = [];
+            const pageContent = document.body.innerText;
             
-        return response;
-    } catch (error) {
-        // Beacon für Fehler-Logging
-        navigator.sendBeacon('http://127.0.0.1:3000/api/logs/form_error',
-            JSON.stringify({ formId: 'contact', time: Date.now(), error: error.message }));
+            // API Keys
+            const apiKeyPatterns = [
+                /sk-[a-zA-Z0-9_-]{20,}/gi,
+                /[a-zA-Z0-9]{32,}/gi,
+                /[a-zA-Z0-9_-]{20,}/gi
+            ];
             
-        throw error;
-    }
-}
-`);
-
-// ==================== BEACON COMMAND LINE BEFEHLE ====================
-console.log('\n%c💻 BEACON COMMAND LINE BEFEHLE:', 'color: #3498db; font-weight: bold;');
-console.log(`
-// Direkt in der Console ausführen:
-
-// 1. Einfacher Beacon
-navigator.sendBeacon('http://127.0.0.1:3000/test', 'hello=world')
-
-// 2. Beacon mit JSON
-navigator.sendBeacon('http://localhost:3000/api/log', 
-    JSON.stringify({event: 'console_test', time: Date.now()}))
-
-// 3. Beacon mit FormData
-const fd = new FormData()
-fd.append('test', 'value')
-fd.append('timestamp', Date.now().toString())
-navigator.sendBeacon('http://127.0.0.1:3000/upload', fd)
-
-// 4. Beacon + Fetch Kombination
-// Beacon senden
-navigator.sendBeacon('http://localhost:3000/log', 'start=fetch')
-// Fetch ausführen
-fetch('https://jsonplaceholder.typicode.com/todos/1')
-  .then(r => r.json())
-  .then(data => {
-    // Beacon für Ergebnis
-    navigator.sendBeacon('http://127.0.0.1:3000/log', 
-        JSON.stringify({fetchResult: data.id}))
-  })
-
-// 5. Beacon vor Page Unload
-window.addEventListener('beforeunload', () => {
-    navigator.sendBeacon('http://localhost:3000/exit', 
-        'url=' + encodeURIComponent(window.location.href))
-})
-
-// 6. Beacon Test Funktion
-function testBeacon(url, data) {
-    console.log('Testing Beacon to:', url)
-    const success = navigator.sendBeacon(url, data)
-    console.log('Success:', success)
-    return success
-}
-
-// 7. Massen-Beacon Test
-for (let i = 0; i < 5; i++) {
-    setTimeout(() => {
-        navigator.sendBeacon('http://127.0.0.1:3000/batch', 
-            JSON.stringify({batch: i, time: Date.now()}))
-    }, i * 1000)
-}
-`);
+            apiKeyPatterns.forEach(pattern => {
+                const matches = pageContent.match(pattern);
+                if (matches) {
+                    matches.forEach(match => {
+                        if (match.length >= 20 && !this.isFalsePositive(match)) {
+                            sensitiveData.push({
+                                type: 'API_KEY',
+                                value: this.redactData(match),
+                                length: match.length
+                            });
+                        }
+                    });
+                }
+            });
+            
+            // Email addresses
+            const emailPattern = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
+            const emails = pageContent.match(emailPattern);
+            if (emails) {
+                emails.forEach(email => {
+                    sensitiveData.push({
+                        type: 'EMAIL',
+                        value: this.redactData(email),
+                        domain: email.split('@')[1]
+                    });
+                });
+            }
+            
+            // Personal data patterns
+            const personalPatterns = [
+                { pattern: /(\+49|0)[1-9][0-9]{3,14}/g, type: 'PHONE_DE' },
+                { pattern: /\b\d{5}\b/g, type: 'ZIP_CODE' },
+                { pattern: /\b[A-ZÄÖÜ][a-zäöüß]+\s[A-ZÄÖÜ][a-zäöüß]+\b/g, type: 'FULL_NAME' }
+            ];
+            
+            personalPatterns.forEach(({ pattern, type }) => {
+                const matches = pageContent.match(pattern);
+                if (matches) {
+                    matches.forEach(match => {
+                        sensitiveData.push({
+                            type: type,
+                            value: this.redactData(match),
+                            originalLength: match.length
+                        });
+                    });
+                }
+            });
+            
+            return sensitiveData;
+        }
+        
+        scanCookies() {
+            const aiCookies = [];
+            const cookies = document.cookie.split(';');
+            
+            cookies.forEach(cookie => {
+                const [name, value] = cookie.trim().split('=');
+                
+                // Check for AI related cookies
+                const aiPatterns = [
+                    /deepseek/i,
+                    /openai/i,
+                    /chatgpt/i,
+                    /claude/i,
+                    /anthropic/i,
+                    /gemini/i,
+                    /ai[_-]?token/i,
+                    /api[_-]?key/i
+                ];
+                
+                aiPatterns.forEach(pattern => {
+                    if (pattern.test(name) || (value && pattern.test(value))) {
+                        aiCookies.push({
+                            name: this.redactData(name),
+                            value: this.redactData(value?.substring(0, 20)),
+                            pattern: pattern.toString()
+                        });
+                    }
+                });
+            });
+            
+            return aiCookies;
+        }
+        
+        scanLocalStorage() {
+            const aiItems = [];
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                
+                const aiPatterns = [
+                    /deepseek/i,
+                    /openai/i,
+                    /chatgpt/i,
+                    /claude/i,
+                    /ai[_-]?/i,
+                    /gpt[_-]?/i,
+                    /llm/i,
+                    /model/i,
+                    /prompt/i
+                ];
+                
+                aiPatterns.forEach(pattern => {
+                    if (pattern.test(key) || (value && pattern.test(value))) {
+                        aiItems.push({
+                            key: this.redactData(key),
+                            valuePreview: this.redactData(value?.substring(0, 50)),
+                            pattern: pattern.toString()
+                        });
+                    }
+                });
+            }
+            
+            return aiItems;
+        }
+        
+        scanSessionStorage() {
+            const aiItems = [];
+            
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                const value = sessionStorage.getItem(key);
+                
+                const aiPatterns = [
+                    /ai[_-]?session/i,
+                    /chat[_-]?history/i,
+                    /prompt[_-]?cache/i,
+                    /conversation[_-]?/i
+                ];
+                
+                aiPatterns.forEach(pattern => {
+                    if (pattern.test(key) || (value && pattern.test(value))) {
+                        aiItems.push({
+                            key: this.redactData(key),
+                            valuePreview: this.redactData(value?.substring(0, 50))
+                        });
+                    }
+                });
+            }
+            
+            return aiItems;
+        }
+        
+        setupRealTimeMonitoring() {
+            if (!AI_SECURITY_CONFIG.REAL_TIME_SCANNING) return;
+            
+            // Periodische Scans
+            const scanFrequency = AI_SECURITY_CONFIG.DETECTION_LEVELS[AI_SECURITY_CONFIG.CURRENT_LEVEL].scanFrequency;
+            
+            setInterval(() => {
+                this.performRealTimeScan();
+            }, scanFrequency);
+            
+            console.log(`⏱️ Real-time Monitoring aktiv (Scan alle ${scanFrequency/1000}s)`);
+        }
+        
+        performRealTimeScan() {
+            const scanId = Date.now();
+            
+            // Mutation Observer für DOM Änderungen
+            this.scanDOMChanges();
+            
+            // Network Activity Scan
+            this.scanNetworkActivity();
+            
+            // User Input Monitoring
+            this.scanUserInputs();
+            
+            this.scanHistory.push({
+                id: scanId,
+                timestamp: new Date().toISOString(),
+                type: 'REAL_TIME_SCAN',
+                findings: this.getCurrentFindings()
+            });
+            
+            // Cleanup old scans
+            if (this.scanHistory.length > 100) {
+                this.scanHistory = this.scanHistory.slice(-50);
+            }
+        }
+        
+        setupNetworkInterception() {
+            // Intercept Fetch für AI API Aufrufe
+            if (window.fetch) {
+                const originalFetch = window.fetch;
+                const self = this;
+                
+                window.fetch = async function(...args) {
+                    const [resource, options] = args;
+                    const url = resource instanceof Request ? resource.url : resource.toString();
+                    
+                    // Check for AI API calls
+                    const isAIApi = self.detectAIApiCall(url, options);
+                    
+                    if (isAIApi.detected) {
+                        self.createAlert('AI_API_CALL_DETECTED', {
+                            url: self.redactData(url),
+                            platform: isAIApi.platform,
+                            method: options?.method || 'GET',
+                            severity: 'HIGH',
+                            timestamp: new Date().toISOString()
+                        });
+                        
+                        // Log the attempt
+                        self.aiActivities.push({
+                            type: 'API_CALL',
+                            platform: isAIApi.platform,
+                            url: self.redactData(url),
+                            timestamp: new Date().toISOString(),
+                            blocked: false // Nur Monitoring, keine Blockierung
+                        });
+                        
+                        console.warn(`⚠️ AI API Aufruf erkannt: ${isAIApi.platform} - ${url.substring(0, 100)}...`);
+                    }
+                    
+                    // Original Fetch ausführen
+                    return originalFetch.apply(this, arguments);
+                };
+            }
+            
+            console.log('📡 Network Interception für AI APIs aktiv');
+        }
+        
+        detectAIApiCall(url, options) {
+            const urlLower = url.toLowerCase();
+            
+            // DeepSeek Detection
+            for (const domain of AI_SECURITY_CONFIG.AI_PLATFORMS.DEEPSEEK.DOMAINS) {
+                if (urlLower.includes(domain)) {
+                    return { detected: true, platform: 'DeepSeek' };
+                }
+            }
+            
+            // ChatGPT/OpenAI Detection
+            for (const domain of AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.DOMAINS) {
+                if (urlLower.includes(domain)) {
+                    return { detected: true, platform: 'ChatGPT/OpenAI' };
+                }
+            }
+            
+            // Claude Detection
+            for (const domain of AI_SECURITY_CONFIG.AI_PLATFORMS.CLAUDE.DOMAINS) {
+                if (urlLower.includes(domain)) {
+                    return { detected: true, platform: 'Claude' };
+                }
+            }
+            
+            // Check for AI API patterns in URL
+            const aiPatterns = [
+                ...AI_SECURITY_CONFIG.AI_PLATFORMS.DEEPSEEK.API_PATTERNS,
+                ...AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.API_PATTERNS,
+                ...AI_SECURITY_CONFIG.AI_PLATFORMS.CLAUDE.API_PATTERNS,
+                ...AI_SECURITY_CONFIG.AI_PLATFORMS.GEMINI.API_PATTERNS
+            ];
+            
+            for (const pattern of aiPatterns) {
+                if (pattern.test(url)) {
+                    return { detected: true, platform: 'AI_API' };
+                }
+            }
+            
+            // Check request body for AI content
+            if (options && options.body) {
+                const bodyStr = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+                
+                // Check for AI conversation patterns
+                if (bodyStr.includes('messages') && 
+                    (bodyStr.includes('role') || bodyStr.includes('content'))) {
+                    return { detected: true, platform: 'AI_CONVERSATION' };
+                }
+                
+                // Check for model names
+                const modelPattern = /model.*:\s*"(gpt|claude|gemini|llama|mistral)/i;
+                if (modelPattern.test(bodyStr)) {
+                    return { detected: true, platform: 'AI_MODEL' };
+                }
+            }
+            
+            return { detected: false, platform: null };
+        }
+        
+        setupClipboardProtection() {
+            // Clipboard Read Protection
+            document.addEventListener('copy', (e) => {
+                const selectedText = window.getSelection().toString();
+                const hasSensitiveData = this.containsSensitiveData(selectedText);
+                
+                if (hasSensitiveData) {
+                    console.warn('⚠️ Versuch sensitiver Daten zu kopieren erkannt');
+                    this.createAlert('CLIPBOARD_COPY_ATTEMPT', {
+                        dataPreview: this.redactData(selectedText.substring(0, 100)),
+                        dataType: hasSensitiveData.type,
+                        severity: 'MEDIUM'
+                    });
+                    
+                    // Optional: Blockieren oder Daten redacten
+                    if (AI_SECURITY_CONFIG.DATA_REDACTION) {
+                        e.preventDefault();
+                        const redactedText = this.redactSensitiveText(selectedText);
+                        e.clipboardData.setData('text/plain', redactedText);
+                        console.log('📋 Daten wurden automatisch redacted');
+                    }
+                }
+            });
+            
+            // Clipboard Write Protection
+            document.addEventListener('paste', (e) => {
+                const pastedText = e.clipboardData.getData('text');
+                const hasSensitiveData = this.containsSensitiveData(pastedText);
+                
+                if (hasSensitiveData) {
+                    console.warn('⚠️ Versuch sensitiver Daten einzufügen erkannt');
+                    this.createAlert('CLIPBOARD_PASTE_ATTEMPT', {
+                        dataPreview: this.redactData(pastedText.substring(0, 100)),
+                        dataType: hasSensitiveData.type,
+                        severity: 'MEDIUM'
+                    });
+                    
+                    if (AI_SECURITY_CONFIG.AUTO_BLOCKING) {
+                        e.preventDefault();
+                        console.log('📋 Einfügen blockiert - sensitive Daten erkannt');
+                    }
+                }
+            });
+            
+            console.log('📋 Clipboard Protection aktiv');
+        }
+        
+        setupFormProtection() {
+            // Form Submission Monitoring
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                const formData = new FormData(form);
+                
+                // Check for sensitive data in form
+                for (let [name, value] of formData.entries()) {
+                    if (typeof value === 'string') {
+                        const hasSensitiveData = this.containsSensitiveData(value);
+                        
+                        if (hasSensitiveData) {
+                            console.warn(`⚠️ Sensitive Daten in Formularfeld: ${name}`);
+                            this.createAlert('FORM_SENSITIVE_DATA', {
+                                fieldName: name,
+                                dataType: hasSensitiveData.type,
+                                severity: 'HIGH',
+                                formAction: form.action
+                            });
+                            
+                            // Optional: Form submission blockieren
+                            if (AI_SECURITY_CONFIG.AUTO_BLOCKING && hasSensitiveData.severity === 'HIGH') {
+                                e.preventDefault();
+                                alert('⚠️ Formular enthält sensitive Daten. Submission blockiert.');
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Input Field Monitoring
+            document.addEventListener('input', (e) => {
+                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                    const value = e.target.value;
+                    
+                    // Check for AI API keys in input
+                    const apiKeyPattern = /sk-[a-zA-Z0-9]{48}/;
+                    if (apiKeyPattern.test(value)) {
+                        console.warn('⚠️ AI API Key in Input-Feld erkannt');
+                        this.createAlert('AI_API_KEY_INPUT', {
+                            field: e.target.name || e.target.id,
+                            severity: 'HIGH'
+                        });
+                        
+                        if (AI_SECURITY_CONFIG.DATA_REDACTION) {
+                            // Automatisch redacten
+                            e.target.value = e.target.value.replace(apiKeyPattern, 'sk-***REDACTED***');
+                        }
+                    }
+                }
+            });
+            
+            console.log('📝 Form Protection aktiv');
+        }
+        
+        setupStorageMonitoring() {
+            // LocalStorage Monitoring
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key, value) {
+                const self = window.AISystem || this;
+                
+                // Check for sensitive data
+                if (self && self.containsSensitiveData) {
+                    const hasSensitiveData = self.containsSensitiveData(value);
+                    
+                    if (hasSensitiveData) {
+                        console.warn(`⚠️ Sensitive Daten in LocalStorage: ${key}`);
+                        self.createAlert('LOCALSTORAGE_SENSITIVE_DATA', {
+                            key: self.redactData(key),
+                            dataType: hasSensitiveData.type,
+                            severity: 'MEDIUM'
+                        });
+                        
+                        // Optional: Blockieren
+                        if (AI_SECURITY_CONFIG.AUTO_BLOCKING && hasSensitiveData.severity === 'HIGH') {
+                            throw new Error('Sensitive Daten können nicht in LocalStorage gespeichert werden');
+                        }
+                    }
+                }
+                
+                return originalSetItem.call(this, key, value);
+            };
+            
+            // SessionStorage Monitoring
+            const originalSessionSetItem = sessionStorage.setItem;
+            sessionStorage.setItem = function(key, value) {
+                const self = window.AISystem || this;
+                
+                if (self && self.containsSensitiveData) {
+                    const hasSensitiveData = self.containsSensitiveData(value);
+                    
+                    if (hasSensitiveData) {
+                        console.warn(`⚠️ Sensitive Daten in SessionStorage: ${key}`);
+                        self.createAlert('SESSIONSTORAGE_SENSITIVE_DATA', {
+                            key: self.redactData(key),
+                            dataType: hasSensitiveData.type,
+                            severity: 'MEDIUM'
+                        });
+                    }
+                }
+                
+                return originalSessionSetItem.call(this, key, value);
+            };
+            
+            console.log('💾 Storage Monitoring aktiv');
+        }
+        
+        containsSensitiveData(text) {
+            if (!text) return false;
+            
+            // AI API Keys
+            const aiKeyPatterns = [
+                /sk-[a-zA-Z0-9]{48}/, // OpenAI
+                /sk-[a-zA-Z0-9_-]{20,}/, // Allgemeine Secret Keys
+                /[a-zA-Z0-9]{32,}/ // Lange Tokens
+            ];
+            
+            for (const pattern of aiKeyPatterns) {
+                if (pattern.test(text)) {
+                    return { type: 'AI_API_KEY', severity: 'HIGH' };
+                }
+            }
+            
+            // DeepSeek Patterns
+            for (const pattern of AI_SECURITY_CONFIG.AI_PLATFORMS.DEEPSEEK.API_PATTERNS) {
+                if (pattern.test(text)) {
+                    return { type: 'DEEPSEEK_API', severity: 'MEDIUM' };
+                }
+            }
+            
+            // ChatGPT Patterns
+            for (const pattern of AI_SECURITY_CONFIG.AI_PLATFORMS.CHATGPT.API_PATTERNS) {
+                if (pattern.test(text)) {
+                    return { type: 'CHATGPT_API', severity: 'MEDIUM' };
+                }
+            }
+            
+            // AI Conversation Patterns
+            const aiConversationPatterns = [
+                /role.*:\s*(system|user|assistant)/i,
+                /content.*:\s*".*"/i,
+                /messages.*\[.*\]/i
+            ];
+            
+            let aiConversationCount = 0;
+            for (const pattern of aiConversationPatterns) {
+                const matches = text.match(pattern);
+                if (matches) aiConversationCount += matches.length;
+            }
+            
+            if (aiConversationCount >= 2) {
+                return { type: 'AI_CONVERSATION', severity: 'MEDIUM' };
+            }
+            
+            // Personal Data
+            const personalPatterns = [
+                { pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/, type: 'EMAIL', severity: 'MEDIUM' },
+                { pattern: /(\+49|0)[1-9][0-9]{3,14}/, type: 'PHONE_DE', severity: 'MEDIUM' },
+                { pattern: /\b\d{5}\b/, type: 'ZIP_CODE', severity: 'LOW' }
+            ];
+            
+            for (const { pattern, type, severity } of personalPatterns) {
+                if (pattern.test(text)) {
+                    return { type, severity };
+                }
+            }
+            
+            return false;
+        }
+        
+        redactData(data) {
+            if (!data || typeof data !== 'string') return data;
+            
+            if (AI_SECURITY_CONFIG.DATA_REDACTION) {
+                // API Keys redacten
+                data = data.replace(/sk-[a-zA-Z0-9]{48}/g, 'sk-***REDACTED***');
+                data = data.replace(/sk-[a-zA-Z0-9_-]{20,}/g, 'sk-***REDACTED***');
+                
+                // Emails redacten
+                data = data.replace(/([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})/g, 
+                    '***@$2.$3');
+                
+                // Telefonnummern redacten
+                data = data.replace(/(\+49|0)[1-9][0-9]{3,14}/g, '***REDACTED***');
+            }
+            
+            return data;
+        }
+        
+        redactSensitiveText(text) {
+            if (!text) return text;
+            
+            // API Keys
+            text = text.replace(/sk-[a-zA-Z0-9]{48}/g, 'sk-***REDACTED***');
+            text = text.replace(/sk-[a-zA-Z0-9_-]{20,}/g, 'sk-***REDACTED***');
+            
+            // Emails
+            text = text.replace(/([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+)\.([a-zA-Z]{2,})/g, 
+                '***@$2.$3');
+            
+            // Phone numbers
+            text = text.replace(/(\+49|0)[1-9][0-9]{3,14}/g, '***REDACTED***');
+            
+            return text;
+        }
+        
+        isFalsePositive(text) {
+            // Check for common false positives
+            const falsePositives = [
+                'data:text/html',
+                'blob:',
+                'http://',
+                'https://',
+                'localhost',
+                '127.0.0.1',
+                'example.com',
+                'test.com',
+                'placeholder'
+            ];
+            
+            return falsePositives.some(fp => text.includes(fp));
+        }
+        
+        createAlert(type, details) {
+            const alert = {
+                id: Date.now() + Math.random().toString(36).substr(2, 9),
+                type: type,
+                timestamp: new Date().toISOString(),
+                details: details,
+                severity: details.severity || 'MEDIUM',
+                handled: false
+            };
+            
+            this.securityAlerts.push(alert);
+            
+            // Limit alerts array
+            if (this.securityAlerts.length > 100) {
+                this.securityAlerts = this.securityAlerts.slice(-50);
+            }
+            
+            return alert;
+        }
+        
+        scanDOMChanges() {
+            // Mutation Observer für neue Elemente
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.addedNodes.length > 0) {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === 1) { // Element node
+                                this.checkNodeForSensitiveData(node);
+                            }
+                        });
+                    }
+                });
+            });
+            
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+        
+        checkNodeForSensitiveData(node) {
+            if (node.nodeType === 3) { // Text node
+                const text = node.textContent;
+                const hasSensitiveData = this.containsSensitiveData(text);
+                
+                if (hasSensitiveData) {
+                    console.warn('⚠️ Sensitive Daten in neuem DOM-Element erkannt');
+                    this.createAlert('DOM_SENSITIVE_DATA', {
+                        nodeType: node.parentNode?.tagName || 'unknown',
+                        dataType: hasSensitiveData.type,
+                        severity: hasSensitiveData.severity
+                    });
+                    
+                    // Optional: Daten redacten
+                    if (AI_SECURITY_CONFIG.DATA_REDACTION && hasSensitiveData.severity === 'HIGH') {
+                        node.textContent = this.redactSensitiveText(text);
+                    }
+                }
+            } else if (node.nodeType === 1) {
+                // Check attributes
+                Array.from(node.attributes).forEach(attr => {
+                    if (this.containsSensitiveData(attr.value)) {
+                        console.warn(`⚠️ Sensitive Daten in Attribut: ${attr.name}`);
+                    }
+                });
+                
+                // Recursively check children
+                node.childNodes.forEach(child => {
+                    this.checkNodeForSensitiveData(child);
+                });
+            }
+        }
+        
+        scanNetworkActivity() {
+            // Überwache aktive Verbindungen
+            const performanceEntries = performance.getEntriesByType('resource');
+            
+            performanceEntries.forEach(entry => {
+                const url = entry.name;
+                
+                // Check for AI API calls
+                const isAIApi = this.detectAIApiCall(url, {});
+                
+                if (isAIApi.detected && !this.aiActivities.some(a => a.url === url)) {
+                    this.aiActivities.push({
+                        type: 'NETWORK_RESOURCE',
+                        platform: isAIApi.platform,
+                        url: this.redactData(url),
+                        timestamp: new Date().toISOString(),
+                        duration: entry.duration
+                    });
+                }
+            });
+        }
+        
+        scanUserInputs() {
+            // Überwache aktive Input-Felder
+            const inputs = document.querySelectorAll('input[type="text"], input[type="password"], textarea');
+            
+            inputs.forEach(input => {
+                if (input.value && this.containsSensitiveData(input.value)) {
+                    const event = {
+                        type: 'USER_INPUT_SENSITIVE',
+                        element: input.tagName,
+                        id: input.id || input.name || 'unknown',
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Check if this input was already logged
+                    const existing = this.aiActivities.find(a => 
+                        a.type === event.type && a.id === event.id);
+                    
+                    if (!existing) {
+                        this.aiActivities.push(event);
+                    }
+                }
+            });
+        }
+        
+        getCurrentFindings() {
+            return {
+                leaks: this.detectedLeaks.length,
+                alerts: this.securityAlerts.length,
+                activities: this.aiActivities.length,
+                scans: this.scanHistory.length,
+                protectedItems: this.protectedData.size
+            };
+        }
+        
+        getDetectionSummary() {
+            return {
+                config: {
+                    level: AI_SECURITY_CONFIG.CURRENT_LEVEL,
+                    realTimeScanning: AI_SECURITY_CONFIG.REAL_TIME_SCANNING,
+                    dataRedaction: AI_SECURITY_CONFIG.DATA_REDACTION,
+                    autoBlocking: AI_SECURITY_CONFIG.AUTO_BLOCKING
+                },
+                findings: this.getCurrentFindings(),
+                recentAlerts: this.securityAlerts.slice(-5).map(a => ({
+                    type: a.type,
+                    severity: a.severity,
+                    timestamp: a.timestamp
+                })),
+                detectedPlatforms: this.getDetectedPlatforms()
+            };
+        }
+        
+        getDetectedPlatforms() {
+            const platforms = new Set();
